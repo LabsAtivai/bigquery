@@ -1,6 +1,6 @@
-import { Controller, Get, Query, Res, HttpException, HttpStatus } from '@nestjs/common';
-import { LeadsService } from './leads.service';
-import type { Response } from 'express';
+import { Controller, Get, Query, Res, HttpException, HttpStatus } from '@nestjs/common'
+import { LeadsService } from './leads.service'
+import type { Response } from 'express'
 
 @Controller('leads')
 export class LeadsController {
@@ -9,27 +9,28 @@ export class LeadsController {
   @Get()
   async findAll(@Query() query: any) {
     try {
-      return await this.leadsService.findAll(query);
+      // ✅ normalize no service (centraliza regra)
+      return await this.leadsService.findAll(query)
     } catch (err) {
-      throw new HttpException('Erro ao listar leads', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Erro ao listar leads', HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
   @Get('filters')
   async filters(@Query() query: any) {
     try {
-      return await this.leadsService.getFilters(query);
+      return await this.leadsService.getFilters(query)
     } catch (err) {
-      throw new HttpException('Erro ao carregar filtros', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Erro ao carregar filtros', HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
   @Get('export')
   async export(@Query() query: any, @Res() res: Response) {
     try {
-      return await this.leadsService.export(query, res);
+      return await this.leadsService.export(query, res)
     } catch (err) {
-      throw new HttpException('Erro ao exportar', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Erro ao exportar', HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 }

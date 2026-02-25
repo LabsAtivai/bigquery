@@ -1,16 +1,11 @@
 import { Module } from '@nestjs/common';
-import { LeadsService } from './leads.service';
-import { LeadsController } from './leads.controller';
-import { CampaignsModule } from '../campaigns/campaigns.module';
 import { MongoModule } from '../mongo/mongo.module';
-import { ConfigModule } from '@nestjs/config';
+import { CampaignsModule } from '../campaigns/campaigns.module';
+import { LeadsController } from './leads.controller';
+import { LeadsService } from './leads.service';
 
 @Module({
-  imports: [
-    CampaignsModule,
-    MongoModule,
-    ConfigModule.forRoot(),
-  ],
+  imports: [MongoModule, CampaignsModule],
   controllers: [LeadsController],
   providers: [LeadsService],
 })

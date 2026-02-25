@@ -1,3 +1,4 @@
+# app/validators.py
 import re
 
 def is_valid_email(email):
@@ -17,14 +18,4 @@ def valid_company_size(size):
     ]
 
     size = str(size).strip()
-
-    if size in allowed:
-        return size
-
-    return None
-
-# Adicionei na refatoração, mas se não quiser, remova
-def is_valid_phone(phone):
-    if not phone:
-        return False
-    return bool(re.match(r'^\d{8,15}$', phone))
+    return size if size in allowed else None

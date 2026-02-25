@@ -170,7 +170,6 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
-<style scoped>
 .ss {
   position: relative;
   width: 100%;
@@ -179,149 +178,142 @@ onBeforeUnmount(() => {
 .ss-input {
   position: relative;
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  padding: 6px 12px;
-  border-radius: 10px;
-  border: 1px solid #2a2a2a;
-  background: #141414;
-  min-height: 42px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 12px 10px;
+  transition: var(--transition);
 }
 
 .ss-input:focus-within {
-  border-color: #ff6a00;
-  box-shadow: 0 0 0 3px rgba(255, 106, 0, 0.15);
+  border-color: rgba(255, 106, 0, 0.6);
+  box-shadow: 0 0 0 4px rgba(255, 106, 0, 0.12);
 }
 
 .selected-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-right: 8px;
+  gap: 8px;
 }
 
 .badge {
-  background: #ff6a00;
-  color: white;
-  padding: 4px 10px;
-  border-radius: 16px;
-  font-size: 12px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  border: 1px solid rgba(255, 106, 0, 0.25);
+  background: rgba(255, 106, 0, 0.10);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
 }
 
 .badge-remove {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
   cursor: pointer;
-  padding: 0;
+  font-size: 1rem;
   line-height: 1;
 }
+.badge-remove:hover {
+  color: var(--accent);
+}
 
-.ss-input input {
-  flex: 1;
-  min-width: 120px;
+.ss input {
+  width: 100%;
+  border: 0;
+  outline: 0;
   background: transparent;
-  border: none;
-  color: white;
-  outline: none;
-  padding: 4px 0;
-  font-size: 14px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  padding-right: 34px; /* espaço pro X */
+}
+
+.ss input::placeholder {
+  color: var(--text-muted);
 }
 
 .ss-clear {
-  background: #242424;
-  border: none;
-  color: white;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: 16px;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-primary);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s;
 }
-
 .ss-clear:hover {
-  background: #ff6a00;
+  border-color: rgba(255, 106, 0, 0.5);
 }
 
 .ss-pop {
   position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin-top: 6px;
-  background: #101010;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 50;
+  width: 100%;
+  margin-top: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
   max-height: 320px;
   overflow-y: auto;
-  z-index: 100;
+}
+
+.ss-empty {
+  padding: 14px 14px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
 }
 
 .ss-item {
   width: 100%;
-  padding: 10px 16px;
-  border: none;
-  background: none;
-  color: white;
-  text-align: left;
-  cursor: pointer;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: background 0.15s;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
 }
 
 .ss-item:hover {
-  background: rgba(255, 106, 0, 0.12);
+  background: rgba(255, 106, 0, 0.10);
 }
 
 .ss-selected {
-  background: rgba(255, 106, 0, 0.25);
-  font-weight: 500;
+  background: rgba(255, 106, 0, 0.14);
 }
 
 .ss-label {
-  flex: 1;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ss-count {
-  min-width: 40px;
-  text-align: right;
-  color: #ff6a00;
-  font-weight: bold;
-  background: rgba(255, 106, 0, 0.1);
-  padding: 2px 8px;
-  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  border: 1px solid rgba(255,255,255,0.10);
+  padding: 4px 8px;
+  border-radius: 999px;
 }
 
-.ss-empty {
-  padding: 12px 16px;
-  color: #888;
-  text-align: center;
-  font-style: italic;
-}
-
-/* Transição suave do dropdown */
+/* fade do dropdown */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.12s ease;
 }
-
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
 }
-</style>

@@ -1,207 +1,155 @@
 <script setup lang="ts">
 import { reactive, onMounted, watch } from 'vue'
+import AppShell from '../components/AppShell.vue'
 import { useCampaignsStore } from '../stores/campaigns.store'
+import { downloadCampaign } from '../api/campaigns'
 
 const store = useCampaignsStore()
-const filters = reactive({
+
+const query = reactive({
   name: '',
   user: '',
-  client: ''
+  client: '',
 })
 
-async function loadCampaigns() {
-  await store.fetchCampaigns(filters)
-}
+let t: any = null
+watch(query, () => {
+  clearTimeout(t)
+  t = setTimeout(() => store.fetchCampaigns(query), 300)
+}, { deep: true })
 
-watch(filters, () => loadCampaigns(), { deep: true })
-
-onMounted(loadCampaigns)
+onMounted(() => store.fetchCampaigns(query))
 </script>
 
 <template>
-  <div class="campaigns-page">
-    <h2>Campanhas</h2>
+  <AppShell>
+    <div class="card">
+      <div class="head">
+        <div>
+          <h2>Campanhas</h2>
+          <p class="muted">Pesquise por nome, usuário ou cliente e faça download do arquivo gerado.</p>
+        </div>
+      </div>
 
-    <!-- 🔎 Filtros -->
-    <div class="filters">
-      <input v-model="filters.client" placeholder="Cliente" />
-      <input v-model="filters.name" placeholder="Nome da campanha" />
-      <input v-model="filters.user" placeholder="Usuário" />
+      <div class="filters">
+        <label>
+          <span>Nome</span>
+          <input v-model="query.name" placeholder="Ex: Adcont" />
+        </label>
+        <label>
+          <span>Usuário</span>
+          <input v-model="query.user" placeholder="Ex: cesar" />
+        </label>
+        <label>
+          <span>Cliente</span>
+          <input v-model="query.client" placeholder="Ex: Adcont" />
+        </label>
+      </div>
+
+      <div class="table-wrap" v-if="store.data.length">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Cliente</th>
+              <th>Usuário</th>
+              <th>Data</th>
+              <th>Qtd Leads</th>
+              <th>Arquivo</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in store.data" :key="c._id">
+              <td>{{ c.name }}</td>
+              <td>{{ c.client || '-' }}</td>
+              <td>{{ c.created_by }}</td>
+              <td>{{ new Date(c.created_at).toLocaleString() }}</td>
+              <td>{{ c.leads_count }}</td>
+              <td class="mono">{{ c.file?.filename }}</td>
+              <td class="actions">
+                <button class="btn-outline" @click="downloadCampaign(c._id, 'xlsx')">XLSX</button>
+                <button class="btn-outline" @click="downloadCampaign(c._id, 'csv')">CSV</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-else class="empty">
+        <div class="muted" v-if="store.loading">Carregando…</div>
+        <div class="muted" v-else>Nenhuma campanha encontrada.</div>
+      </div>
+
+      <div class="error" v-if="store.error">{{ store.error }}</div>
     </div>
-
-    <!-- 📊 Tabela -->
-    <div class="table-container">
-      <table v-if="store.campaigns.length">
-        <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Cliente</th>
-            <th>Usuário</th>
-            <th>Total</th>
-            <th>Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="campaign in store.campaigns" :key="campaign._id">
-            <td>{{ campaign.name }}</td>
-            <td>{{ campaign.filters?.client || '-' }}</td>
-            <td>{{ campaign.created_by }}</td>
-            <td>{{ campaign.leads_count }}</td>
-            <td class="actions">
-              <button class="btn-export" @click="store.downloadCampaign(campaign._id, 'xlsx')">XLSX</button>
-              <button class="btn-export" @click="store.downloadCampaign(campaign._id, 'csv')">CSV</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div v-else-if="!store.loading" class="empty">Nenhuma campanha encontrada.</div>
-      <div v-if="store.loading" class="loading">Carregando campanhas...</div>
-      <p v-if="store.error" class="error">{{ store.error }}</p>
-    </div>
-  </div>
+  </AppShell>
 </template>
 
 <style scoped>
-.campaigns-page {
-  width: 100%;
+.card{
+  background:#0f0f0f;
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:16px;
+  box-shadow: 0 25px 60px rgba(0,0,0,.35);
+}
+.head{ display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+h2{ color: var(--accent); margin:0; font-size:22px; font-weight:900; }
+.muted{ color: var(--muted); margin:6px 0 0 0; font-size:13px; }
+
+.filters{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap:12px;
+  margin-top:10px;
+}
+label{ display:flex; flex-direction:column; gap:6px; }
+label span{ color: var(--muted); font-size:12px; }
+input{
+  padding:12px;
+  border-radius:12px;
+  border:1px solid var(--border);
+  background:#0b0b0b;
+  color: var(--text);
 }
 
-h2 {
-  color: #ff6a00;
-  font-size: 1.8rem;
-  margin-bottom: 25px;
+.table-wrap{
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow:auto;
+  background: #0b0b0b;
 }
-
-/* 🔎 filtros */
-.filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 15px;
-  margin-bottom: 30px;
+table{ width: 100%; border-collapse: collapse; min-width: 960px; }
+th{
+  position: sticky; top:0;
+  background:#0f0f0f;
+  color: var(--accent);
+  text-align:left;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 900;
+  white-space: nowrap;
 }
-
-input {
-  padding: 12px 16px;
-  border-radius: 8px;
-  border: 1px solid #333333;
-  background: #1a1a1a;
-  color: #ffffff;
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
+td{
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  color: var(--text);
+  white-space: nowrap;
 }
-
-input:focus {
-  border-color: #ff6a00;
-  box-shadow: 0 0 0 3px rgba(255, 106, 0, 0.15);
-}
-
-/* 📊 tabela */
-.table-container {
-  background: #1a1a1a;
-  padding: 20px;
+tr:hover td{ background: rgba(255,106,0,.06); }
+.actions{ display:flex; gap:8px; }
+.btn-outline{
+  border: 1px solid rgba(255,106,0,.5);
+  background: rgba(255,106,0,.08);
+  color: var(--accent);
+  font-weight: 800;
+  padding: 8px 10px;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-  overflow-x: auto;
+  cursor:pointer;
 }
-
-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-thead th {
-  background: #111111;
-  color: #ff6a00;
-  text-align: left;
-  padding: 14px 16px;
-  font-weight: 600;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-tbody tr {
-  transition: background 0.2s;
-}
-
-tbody tr:nth-child(even) {
-  background: #141414;
-}
-
-tbody tr:hover {
-  background: #222222;
-}
-
-td {
-  padding: 12px 16px;
-  border-bottom: 1px solid #222222;
-}
-
-.actions {
-  display: flex;
-  gap: 10px;
-}
-
-/* 🔘 botão export */
-.btn-export {
-  background: #ff6a00;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 6px;
-  color: #ffffff;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background 0.2s, transform 0.1s;
-}
-
-.btn-export:hover {
-  background: #ff8533;
-  transform: translateY(-1px);
-}
-
-/* estados */
-.empty {
-  padding: 20px;
-  text-align: center;
-  color: #aaaaaa;
-  font-style: italic;
-}
-
-.loading {
-  padding: 20px;
-  text-align: center;
-  color: #ff6a00;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0% { opacity: 0.6; }
-  50% { opacity: 1; }
-  100% { opacity: 0.6; }
-}
-
-.error {
-  color: #ff0000;
-  text-align: center;
-  margin-top: 10px;
-}
-
-/* 📱 responsivo */
-@media (max-width: 768px) {
-  table {
-    font-size: 13px;
-  }
-
-  input {
-    font-size: 13px;
-  }
-
-  .actions {
-    flex-direction: column;
-    gap: 5px;
-  }
-}
+.mono{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+.empty{ padding: 16px; border:1px dashed var(--border); border-radius:16px; margin-top:14px; }
+.error{ margin-top: 12px; color: #ff4d4d; font-weight: 800; }
 </style>

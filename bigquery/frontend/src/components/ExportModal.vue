@@ -1,147 +1,159 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useLeadsStore } from '../stores/leads.store'
+import { reactive } from 'vue'
 
-const emit = defineEmits(['close'])
-const store = useLeadsStore()
-const campaignName = ref('')
-const format = ref<'csv' | 'xlsx'>('xlsx')
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'submit', payload: {
+    campaignName: string
+    format: 'xlsx' | 'csv'
+    downloadedBy: string
+    clientName: string
+    setorInformado: string
+    user: string
+  }): void
+}>()
 
-const exportNow = async () => {
-  try {
-    await store.exportLeads(store.filters, campaignName.value, format.value)
-    emit('close')
-  } catch (err) {
-    console.error(err)
-  }
+const form = reactive({
+  campaignName: 'Export Leads',
+  format: 'xlsx' as 'xlsx' | 'csv',
+  downloadedBy: '',
+  clientName: '',
+  setorInformado: '',
+  user: '',
+})
+
+function submit() {
+  emit('submit', { ...form })
+  emit('close')
 }
 </script>
 
 <template>
-  <transition name="modal-fade">
-    <div class="modal" v-if="true">
-      <div class="box">
-        <h2>Nova Campanha</h2>
-        <label for="campaignName">Nome da campanha</label>
-        <input id="campaignName" v-model="campaignName" placeholder="Nome campanha" />
-        <label for="format">Formato</label>
-        <select id="format" v-model="format">
-          <option value="csv">CSV</option>
-          <option value="xlsx">XLSX</option>
-        </select>
-        <button :disabled="store.exporting" @click="exportNow">
-          {{ store.exporting ? 'Exportando...' : 'Exportar' }}
-        </button>
-        <button @click="$emit('close')">Cancelar</button>
-        <p v-if="store.error" class="error">{{ store.error }}</p>
+  <div class="modal-backdrop" @click.self="emit('close')">
+    <div class="modal">
+      <div class="modal-head">
+        <div class="modal-title">Exportar Leads</div>
+        <button class="icon" @click="emit('close')">✕</button>
+      </div>
+
+      <div class="grid">
+        <label>
+          <span>Nome da campanha</span>
+          <input v-model="form.campaignName" placeholder="Ex: Adcont - Financeiro" />
+        </label>
+
+        <label>
+          <span>Formato</span>
+          <select v-model="form.format">
+            <option value="xlsx">XLSX</option>
+            <option value="csv">CSV</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Quem está baixando</span>
+          <input v-model="form.downloadedBy" placeholder="Ex: Charles" />
+        </label>
+
+        <label>
+          <span>Nome do cliente</span>
+          <input v-model="form.clientName" placeholder="Ex: Adcont" />
+        </label>
+
+        <label class="full">
+          <span>Setor informado (no momento do export)</span>
+          <input v-model="form.setorInformado" placeholder="Ex: Financeiro" />
+        </label>
+
+        <label class="full">
+          <span>User (opcional - salva no backend)</span>
+          <input v-model="form.user" placeholder="Ex: charles@ativa.ai" />
+        </label>
+      </div>
+
+      <div class="actions">
+        <button class="btn-ghost" @click="emit('close')">Cancelar</button>
+        <button class="btn-primary" @click="submit">Exportar</button>
+      </div>
+
+      <div class="hint">
+        Dica: ao exportar, eu salvo a campanha no backend com esses metadados.
       </div>
     </div>
-  </transition>
+  </div>
 </template>
 
 <style scoped>
-.modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
+.modal-backdrop{
+  position:fixed; inset:0;
+  background: rgba(0,0,0,.65);
+  display:flex; align-items:center; justify-content:center;
+  padding:16px; z-index:100;
 }
-
-.box {
-  background: #1a1a1a;
-  padding: 30px;
-  width: 400px;
+.modal{
+  width:min(720px, 100%);
+  background:#0f0f0f;
+  border:1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 25px 70px rgba(0,0,0,.6);
+  padding:14px;
+}
+.modal-head{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom: 12px;
+}
+.modal-title{ font-weight: 800; color: var(--accent); font-size: 18px; }
+.icon{
+  background:#0b0b0b;
+  border:1px solid var(--border);
+  color: var(--text);
   border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  text-align: left;
+  padding:8px 10px;
+  cursor:pointer;
 }
-
-h2 {
-  color: #ff6a00;
-  margin-bottom: 20px;
+.grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
-
-label {
-  display: block;
-  color: #dddddd;
-  margin-bottom: 5px;
-  font-size: 14px;
-}
-
-input, select {
-  width: 100%;
+label{ display:flex; flex-direction:column; gap:6px; }
+label span{ color: var(--muted); font-size:12px; }
+input, select{
   padding: 12px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-  border: 1px solid #333333;
-  background: #141414;
-  color: #ffffff;
-  outline: none;
-  transition: border-color 0.2s;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: #0b0b0b;
+  color: var(--text);
 }
+.full{ grid-column: 1 / -1; }
 
-input:focus, select:focus {
-  border-color: #ff6a00;
+.actions{
+  display:flex; justify-content:flex-end; gap:10px;
+  margin-top: 14px;
 }
-
-button {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-  margin-bottom: 10px;
-  font-weight: bold;
+.btn-ghost{
+  padding:12px 16px;
+  border-radius: 12px;
+  border:1px solid var(--border);
+  background:#0b0b0b;
+  color: var(--text);
+  cursor:pointer;
 }
-
-button:first-of-type {
-  background: #ff6a00;
-  border: none;
-  color: #ffffff;
+.btn-primary{
+  padding:12px 16px;
+  border-radius: 12px;
+  border:none;
+  background: linear-gradient(135deg, var(--accent), #ff8c3a);
+  color:#0b0b0b;
+  font-weight:900;
+  cursor:pointer;
 }
-
-button:first-of-type:hover {
-  background: #ff8533;
-}
-
-button:first-of-type:disabled {
-  background: #cc5500;
-  cursor: not-allowed;
-}
-
-button:last-of-type {
-  background: transparent;
-  border: 1px solid #ff6a00;
-  color: #ff6a00;
-}
-
-button:last-of-type:hover {
-  background: #ff6a00;
-  color: #ffffff;
-}
-
-.error {
-  color: #ff0000;
+.hint{
   margin-top: 10px;
-  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
 }
-
-/* Animação modal */
-.modal-fade-enter-active, .modal-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.modal-fade-enter-from, .modal-fade-leave-to {
-  opacity: 0;
-}
-
-@media (max-width: 768px) {
-  .box {
-    width: 90%;
-    padding: 20px;
-  }
+@media (max-width: 720px){
+  .grid{ grid-template-columns: 1fr; }
 }
 </style>

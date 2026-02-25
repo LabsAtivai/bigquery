@@ -3,11 +3,18 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 
+// Tema global (fonte de verdade)
+import './assets/base.css'
+
+// (Opcional) se você tiver regras globais extras separadas
+// import './assets/main.css'
+
+// Mínimo global (não use o template do Vite aqui)
+import './style.css'
+
 const app = createApp(App)
 
-const pinia = createPinia()
-
-app.use(pinia)   // 🔥 TEM QUE VIR ANTES DO MOUNT
+app.use(createPinia())
 app.use(router)
 
 app.mount('#app')

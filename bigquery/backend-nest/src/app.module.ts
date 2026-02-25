@@ -5,11 +5,6 @@ import { LeadsModule } from './leads/leads.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 
 @Module({
-  imports: [
-    MongoModule,
-    CampaignsModule,
-    ImportsModule,
-    LeadsModule,
-  ],
+  imports: [MongoModule, ImportsModule, LeadsModule, CampaignsModule],
 })
 export class AppModule {}
