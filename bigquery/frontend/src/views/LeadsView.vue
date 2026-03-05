@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { reactive, ref, onMounted, watch } from 'vue'
+import AppShell from '../components/AppShell.vue'
 import { useLeadsStore } from '../stores/leads.store'
 import { getFilters } from '../api/leads'
+import { exportLeads } from '../api/leads'
 import SearchSelect from '../components/SearchSelect.vue'
 import ExportModal from '../components/ExportModal.vue'
 
@@ -21,21 +23,9 @@ const filterOrder = [
 ]
 
 const fixedColumns = [
-  'email',
-  'nome',
-  'nome_completo',
-  'linkedin',
-  'cargo',
-  'pais',
-  'localizacao',
-  'empresa',
-  'url_empresa',
-  'tamanho',
-  'pais_empresa',
-  'localizacao_empresa',
-  'estado_empresa',
-  'cidade_empresa',
-  'setor_empresa'
+  'email','nome','nome_completo','linkedin','cargo',
+  'pais','localizacao','empresa','url_empresa','tamanho',
+  'pais_empresa','localizacao_empresa','estado_empresa','cidade_empresa','setor_empresa'
 ]
 
 const filters = reactive({
@@ -48,32 +38,27 @@ const filters = reactive({
   client: [] as string[]
 })
 
-function handleExport(meta: {
-  campaignName: string
-  format: 'xlsx' | 'csv'
-  downloadedBy: string
-  clientName: string
-  setorInformado: string
-  user: string
-}) {
+function handleExport(meta: any) {
   exportLeads({
-    ...filters,           // ✅ filtros atuais
-    ...meta,              // ✅ meta do modal
-    page: undefined,      // ✅ opcional: remove
-    limit: undefined,     // ✅ opcional: remove
+    ...filters,
+    ...meta,
+    page: undefined,
+    limit: undefined,
+  }).then(result => {
+    if (result.ok) {
+      console.log('Exportação iniciada com sucesso')
+    } else {
+      console.warn('Falha na exportação:', result.message)
+    }
   })
 }
 
-watch(filters, (newVal) => {
-  console.log('[DEBUG] Filtros alterados:', JSON.stringify(newVal, null, 2))
-}, { deep: true })
+watch(filters, () => {}, { deep: true })
 
 async function loadFilters() {
   filtersLoading.value = true
   try {
-    console.log('[DEBUG] Carregando filtros...')
     const { data } = await getFilters(filters)
-    console.log('[DEBUG] Filtros recebidos:', data)
     filterOptions.value = data || {}
   } catch (err) {
     console.error('Erro ao carregar filtros:', err)
@@ -84,10 +69,8 @@ async function loadFilters() {
 }
 
 async function loadLeads() {
-  console.log('[DEBUG] Filtrando com:', JSON.stringify(filters, null, 2))
   try {
     await store.fetchLeads(filters)
-    console.log('[DEBUG] Leads atualizados. Total:', store.total)
   } catch (err) {
     console.error('Erro ao carregar leads:', err)
     store.error = 'Erro ao filtrar leads.'
@@ -101,14 +84,22 @@ onMounted(async () => {
 </script>
 
 <template>
+<AppShell>
+
   <div class="page">
+
     <h2>Leads</h2>
 
     <div class="filters-bar">
-      <div v-if="filtersLoading" class="loading">Carregando filtros...</div>
+
+      <div v-if="filtersLoading" class="loading">
+        Carregando filtros...
+      </div>
+
       <div v-else-if="Object.keys(filterOptions).length === 0" class="empty">
         Nenhuma opção de filtro disponível.
       </div>
+
       <div v-else class="filter-group">
         <SearchSelect
           v-for="item in filterOrder"
@@ -121,42 +112,71 @@ onMounted(async () => {
       </div>
 
       <div class="action-buttons">
-        <button class="btn-primary" @click="loadLeads" :disabled="store.loading">
+        <button
+          class="btn-primary"
+          @click="loadLeads"
+          :disabled="store.loading"
+        >
           Filtrar
         </button>
-        <button class="btn-outline" @click="showModal = true">
+
+        <button
+          class="btn-outline"
+          @click="showModal = true"
+        >
           Exportar
         </button>
       </div>
+
     </div>
 
-    <p class="total">Total: {{ store.total }}</p>
+    <p class="total">
+      Total: {{ store.total }}
+    </p>
 
     <div class="table-container" v-if="store.leads.length">
+
       <table>
         <thead>
           <tr>
             <th v-for="col in fixedColumns" :key="col">
-              {{ col.replace(/_/g, ' ').toUpperCase() }}
+              {{ col.replace(/_/g,' ').toUpperCase() }}
             </th>
           </tr>
         </thead>
+
         <tbody>
           <tr v-for="lead in store.leads" :key="lead._id">
             <td v-for="col in fixedColumns" :key="col">
-              {{ lead[col] ?? 'NAN' }}
+              {{ lead[col] ?? '—' }}
             </td>
           </tr>
         </tbody>
+
       </table>
+
     </div>
 
-    <div v-if="store.loading" class="loading">Carregando leads...</div>
-    <p v-if="store.error" class="error">{{ store.error }}</p>
+    <div v-if="store.loading" class="loading">
+      Carregando leads...
+    </div>
 
-    <ExportModal v-if="showModal" @close="showModal = false" />
+    <p v-if="store.error" class="error">
+      {{ store.error }}
+    </p>
+
+    <ExportModal
+      v-if="showModal"
+      @close="showModal = false"
+      @export="handleExport"
+    />
+
   </div>
+
+</AppShell>
 </template>
+
+<!-- styles mantidos iguais – não repeti aqui -->
 
 <style scoped>
 .page {

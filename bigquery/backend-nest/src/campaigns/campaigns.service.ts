@@ -1,31 +1,56 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { MongoService } from '../mongo/mongo.service';
-import { ObjectId } from 'mongodb';
-import type { Response } from 'express';
-import * as csv from 'fast-csv';
-import * as exceljs from 'exceljs';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common'
+import { MongoService } from '../mongo/mongo.service'
+import { ObjectId } from 'mongodb'
+import type { Response } from 'express'
+import * as csv from 'fast-csv'
+import * as exceljs from 'exceljs'
 
 @Injectable()
 export class CampaignsService {
-  constructor(
-    private readonly mongoService: MongoService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly mongoService: MongoService) {}
+
+  // ✅ mantém padrão do export (mesmo do LeadsService)
+  private readonly EXPORT_FIELDS = [
+    'email',
+    'nome',
+    'nome_completo',
+    'linkedin',
+    'cargo',
+    'pais',
+    'localizacao',
+    'empresa',
+    'url_empresa',
+    'tamanho',
+    'pais_empresa',
+    'localizacao_empresa',
+    'estado_empresa',
+    'cidade_empresa',
+    'setor_empresa',
+    'import_id',
+    'updated_at',
+  ]
+
+  private pickExport(doc: any) {
+    const out: any = {}
+    for (const field of this.EXPORT_FIELDS) {
+      out[field] = doc?.[field] ?? ''
+    }
+    return out
+  }
 
   async createCampaign(data: {
-    name: string;
-    client?: string | null;
-    created_by: string;
-    filters: any;
-    leads_count: number;
-    file: { type: string; filename: string; path: string | 'streamed' };
+    name: string
+    client?: string | null
+    created_by: string
+    filters: any
+    leads_count: number
+    file: { type: string; filename: string; path: string | 'streamed' }
     meta?: {
-      downloaded_by?: string | null;
-      setor_informado?: string | null;
-    };
+      downloaded_by?: string | null
+      setor_informado?: string | null
+    }
   }) {
-    const db = this.mongoService.getDb();
+    const db = this.mongoService.getDb()
 
     try {
       await db.collection('campaigns').insertOne({
@@ -40,87 +65,90 @@ export class CampaignsService {
           downloaded_by: data.meta?.downloaded_by || null,
           setor_informado: data.meta?.setor_informado || null,
         },
-      });
+      })
     } catch (err) {
-      throw new HttpException('Erro ao criar campanha', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException('Erro ao criar campanha', HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
   async list(query: any) {
-    const db = this.mongoService.getDb();
+    const db = this.mongoService.getDb()
+    const filter: any = {}
 
-    const filter: any = {};
+    if (query.client) filter.client = { $regex: String(query.client).trim(), $options: 'i' }
+    if (query.name) filter.name = { $regex: String(query.name).trim(), $options: 'i' }
+    if (query.user) filter.created_by = { $regex: String(query.user).trim(), $options: 'i' }
 
-    if (query.client) {
-      filter.client = { $regex: String(query.client).trim(), $options: 'i' };
-    }
-
-    if (query.name) {
-      filter.name = { $regex: String(query.name).trim(), $options: 'i' };
-    }
-
-    if (query.user) {
-      filter.created_by = { $regex: String(query.user).trim(), $options: 'i' };
-    }
-
-    const data = await db
-      .collection('campaigns')
-      .find(filter)
-      .sort({ created_at: -1 })
-      .toArray();
-
-    return data;
+    return db.collection('campaigns').find(filter).sort({ created_at: -1 }).toArray()
   }
 
   async exportCampaignCSV(campaignId: string, res: Response) {
-    const db = this.mongoService.getDb();
+    const db = this.mongoService.getDb()
 
-    const campaign = await db
-      .collection('campaigns')
-      .findOne({ _id: new ObjectId(campaignId) });
+    const campaign = await db.collection('campaigns').findOne({
+      _id: new ObjectId(campaignId),
+    })
 
     if (!campaign) {
-      throw new HttpException('Campanha não encontrada', HttpStatus.NOT_FOUND);
+      throw new HttpException('Campanha não encontrada', HttpStatus.NOT_FOUND)
     }
 
-    // Se file.path for 'streamed', você pode reconstruir, mas por agora assume disco
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${campaign.file.filename}"`);
-    const cursor = db.collection('leads').find(campaign.filters || {});
-    const csvStream = csv.format({ headers: true, delimiter: ';' });
-    csvStream.pipe(res);
+    const filename =
+      campaign?.file?.filename || `campaign-${campaignId}.csv`
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+
+    const cursor = db.collection('leads').find(campaign.filters || {})
+
+    // ✅ headers fixos e ordem garantida
+    const csvStream = csv.format({
+      headers: this.EXPORT_FIELDS,
+      delimiter: ';',
+    })
+
+    csvStream.pipe(res)
+
     for await (const doc of cursor) {
-      csvStream.write(doc);
+      csvStream.write(this.pickExport(doc))
     }
-    csvStream.end();
+
+    csvStream.end()
   }
 
   async exportCampaignXLSX(campaignId: string, res: Response) {
-    const db = this.mongoService.getDb();
+    const db = this.mongoService.getDb()
 
-    const campaign = await db
-      .collection('campaigns')
-      .findOne({ _id: new ObjectId(campaignId) });
+    const campaign = await db.collection('campaigns').findOne({
+      _id: new ObjectId(campaignId),
+    })
 
     if (!campaign) {
-      throw new HttpException('Campanha não encontrada', HttpStatus.NOT_FOUND);
+      throw new HttpException('Campanha não encontrada', HttpStatus.NOT_FOUND)
     }
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${campaign.file.filename}"`);
+    const filename =
+      campaign?.file?.filename || `campaign-${campaignId}.xlsx`
 
-    const workbook = new exceljs.stream.xlsx.WorkbookWriter({ stream: res });
-    const worksheet = workbook.addWorksheet('Leads');
-    const cursor = db.collection('leads').find(campaign.filters || {});
-    const headersAdded = false;
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+
+    const workbook = new exceljs.stream.xlsx.WorkbookWriter({ stream: res })
+    const worksheet = workbook.addWorksheet('Leads')
+
+    // ✅ cabeçalho fixo
+    worksheet.addRow(this.EXPORT_FIELDS).commit()
+
+    const cursor = db.collection('leads').find(campaign.filters || {})
 
     for await (const doc of cursor) {
-      if (!headersAdded) {
-        worksheet.addRow(Object.keys(doc)).commit();
-      }
-      worksheet.addRow(Object.values(doc)).commit();
+      const row = this.pickExport(doc)
+      worksheet.addRow(this.EXPORT_FIELDS.map((k) => row[k])).commit()
     }
 
-    await workbook.commit();
+    await workbook.commit()
   }
 }

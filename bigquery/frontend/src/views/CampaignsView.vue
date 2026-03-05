@@ -2,7 +2,6 @@
 import { reactive, onMounted, watch } from 'vue'
 import AppShell from '../components/AppShell.vue'
 import { useCampaignsStore } from '../stores/campaigns.store'
-import { downloadCampaign } from '../api/campaigns'
 
 const store = useCampaignsStore()
 
@@ -38,7 +37,7 @@ onMounted(() => store.fetchCampaigns(query))
         </label>
         <label>
           <span>Usuário</span>
-          <input v-model="query.user" placeholder="Ex: cesar" />
+          <input v-model="query.user" placeholder="Ex: charles" />
         </label>
         <label>
           <span>Cliente</span>
@@ -46,7 +45,7 @@ onMounted(() => store.fetchCampaigns(query))
         </label>
       </div>
 
-      <div class="table-wrap" v-if="store.data.length">
+      <div class="table-wrap" v-if="store.campaigns.length">
         <table>
           <thead>
             <tr>
@@ -60,7 +59,7 @@ onMounted(() => store.fetchCampaigns(query))
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in store.data" :key="c._id">
+            <tr v-for="c in store.campaigns" :key="c._id">
               <td>{{ c.name }}</td>
               <td>{{ c.client || '-' }}</td>
               <td>{{ c.created_by }}</td>
@@ -68,8 +67,8 @@ onMounted(() => store.fetchCampaigns(query))
               <td>{{ c.leads_count }}</td>
               <td class="mono">{{ c.file?.filename }}</td>
               <td class="actions">
-                <button class="btn-outline" @click="downloadCampaign(c._id, 'xlsx')">XLSX</button>
-                <button class="btn-outline" @click="downloadCampaign(c._id, 'csv')">CSV</button>
+                <button class="btn-outline" @click="store.downloadCampaign(c._id, 'xlsx')">XLSX</button>
+                <button class="btn-outline" @click="store.downloadCampaign(c._id, 'csv')">CSV</button>
               </td>
             </tr>
           </tbody>

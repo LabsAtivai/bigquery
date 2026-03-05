@@ -1,7 +1,8 @@
 import http from './http'
 
-export function listCampaigns(params: any) {
-  return http.get('/campaigns', { params })
+export function getCampaigns(params: any) {
+  const q = new URLSearchParams(params || {}).toString()
+  return http.get(`/campaigns?${q}`)
 }
 
 export function downloadCampaign(id: string, format: 'csv' | 'xlsx') {

@@ -3,13 +3,13 @@ import { reactive } from 'vue'
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'submit', payload: {
+  (e: 'export', meta: {
     campaignName: string
     format: 'xlsx' | 'csv'
     downloadedBy: string
     clientName: string
     setorInformado: string
-    user: string
+    user?: string
   }): void
 }>()
 
@@ -22,8 +22,8 @@ const form = reactive({
   user: '',
 })
 
-function submit() {
-  emit('submit', { ...form })
+function handleSubmit() {
+  emit('export', { ...form })
   emit('close')
 }
 </script>
@@ -41,7 +41,6 @@ function submit() {
           <span>Nome da campanha</span>
           <input v-model="form.campaignName" placeholder="Ex: Adcont - Financeiro" />
         </label>
-
         <label>
           <span>Formato</span>
           <select v-model="form.format">
@@ -49,39 +48,33 @@ function submit() {
             <option value="csv">CSV</option>
           </select>
         </label>
-
         <label>
           <span>Quem está baixando</span>
           <input v-model="form.downloadedBy" placeholder="Ex: Charles" />
         </label>
-
         <label>
           <span>Nome do cliente</span>
           <input v-model="form.clientName" placeholder="Ex: Adcont" />
         </label>
-
         <label class="full">
           <span>Setor informado (no momento do export)</span>
           <input v-model="form.setorInformado" placeholder="Ex: Financeiro" />
-        </label>
-
-        <label class="full">
-          <span>User (opcional - salva no backend)</span>
-          <input v-model="form.user" placeholder="Ex: charles@ativa.ai" />
         </label>
       </div>
 
       <div class="actions">
         <button class="btn-ghost" @click="emit('close')">Cancelar</button>
-        <button class="btn-primary" @click="submit">Exportar</button>
+        <button class="btn-primary" @click="handleSubmit">Exportar Leads</button>
       </div>
 
       <div class="hint">
-        Dica: ao exportar, eu salvo a campanha no backend com esses metadados.
+        Os filtros atuais da tela serão aplicados automaticamente.
       </div>
     </div>
   </div>
 </template>
+
+<!-- styles mantidos iguais – não repeti aqui pra não ficar gigante -->
 
 <style scoped>
 .modal-backdrop{

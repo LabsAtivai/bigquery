@@ -5,9 +5,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: ['http://localhost:5173'],
-    credentials: true,
-  });
+  origin: [
+    'https://leads.labsativa.com.br',
+    'http://localhost:5173'
+  ],
+  credentials: true,
+});
 
   await app.listen(3000);
 }
