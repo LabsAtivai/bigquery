@@ -1,65 +1,118 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, watch } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import AppShell from '../components/AppShell.vue'
 import { useLeadsStore } from '../stores/leads.store'
-import { getFilters } from '../api/leads'
-import { exportLeads } from '../api/leads'
+import { getFilters, exportLeads } from '../api/leads'
 import SearchSelect from '../components/SearchSelect.vue'
 import ExportModal from '../components/ExportModal.vue'
 
 const store = useLeadsStore()
 const showModal = ref(false)
 const filtersLoading = ref(true)
-const filterOptions = ref<any>({})
 
-const filterOrder = [
+/**
+ * ✅ Tipos para evitar TS7053 quando usar item.key
+ */
+type FilterKey =
+  | 'setor_empresa'
+  | 'estado_empresa'
+  | 'cidade_empresa'
+  | 'pais_empresa'
+  | 'tamanho'
+  | 'cargo'
+  | 'client'
+
+type FilterOptionsKey =
+  | 'setores'
+  | 'estados'
+  | 'cidades'
+  | 'paises'
+  | 'tamanhos'
+  | 'cargos'
+  | 'clientes'
+
+const filterOrder: Array<{ key: FilterKey; label: string; optionsKey: FilterOptionsKey }> = [
   { key: 'setor_empresa', label: 'Setor', optionsKey: 'setores' },
   { key: 'estado_empresa', label: 'Estado', optionsKey: 'estados' },
   { key: 'cidade_empresa', label: 'Cidade', optionsKey: 'cidades' },
   { key: 'pais_empresa', label: 'País', optionsKey: 'paises' },
   { key: 'tamanho', label: 'Porte', optionsKey: 'tamanhos' },
   { key: 'cargo', label: 'Cargo', optionsKey: 'cargos' },
-  { key: 'client', label: 'Cliente', optionsKey: 'clientes' }
+  { key: 'client', label: 'Cliente', optionsKey: 'clientes' },
 ]
 
 const fixedColumns = [
   'email','nome','nome_completo','linkedin','cargo',
   'pais','localizacao','empresa','url_empresa','tamanho',
   'pais_empresa','localizacao_empresa','estado_empresa','cidade_empresa','setor_empresa'
-]
+] as const
 
-const filters = reactive({
-  setor_empresa: [] as string[],
-  estado_empresa: [] as string[],
-  cidade_empresa: [] as string[],
-  pais_empresa: [] as string[],
-  tamanho: [] as string[],
-  cargo: [] as string[],
-  client: [] as string[]
+/**
+ * ✅ filtros tipados
+ */
+const filters = reactive<Record<FilterKey, string[]>>({
+  setor_empresa: [],
+  estado_empresa: [],
+  cidade_empresa: [],
+  pais_empresa: [],
+  tamanho: [],
+  cargo: [],
+  client: [],
 })
 
-function handleExport(meta: any) {
+/**
+ * ✅ options tipadas (cada opção vem como { _id, count } no backend)
+ */
+type AggItem = { _id: string; count: number }
+const filterOptions = ref<Record<FilterOptionsKey, AggItem[]>>({
+  setores: [],
+  estados: [],
+  cidades: [],
+  paises: [],
+  tamanhos: [],
+  cargos: [],
+  clientes: [],
+})
+
+/**
+ * ✅ payload do ExportModal (ele emite submit com esse shape)
+ */
+type ExportMeta = {
+  campaignName: string
+  format: 'xlsx' | 'csv'
+  downloadedBy: string
+  clientName: string
+  setorInformado: string
+  user: string
+}
+
+function handleExport(meta: ExportMeta) {
+  // ✅ exportLeads abre uma nova aba/janela (window.open)
+  // então não tem ok/message pra tratar aqui.
   exportLeads({
     ...filters,
     ...meta,
     page: undefined,
     limit: undefined,
-  }).then(result => {
-    if (result.ok) {
-      console.log('Exportação iniciada com sucesso')
-    } else {
-      console.warn('Falha na exportação:', result.message)
-    }
   })
-}
 
-watch(filters, () => {}, { deep: true })
+  showModal.value = false
+}
 
 async function loadFilters() {
   filtersLoading.value = true
   try {
     const { data } = await getFilters(filters)
-    filterOptions.value = data || {}
+    // backend retorna: { setores, estados, cidades, paises, tamanhos, cargos, clientes }
+    filterOptions.value = {
+      setores: data?.setores ?? [],
+      estados: data?.estados ?? [],
+      cidades: data?.cidades ?? [],
+      paises: data?.paises ?? [],
+      tamanhos: data?.tamanhos ?? [],
+      cargos: data?.cargos ?? [],
+      clientes: data?.clientes ?? [],
+    }
   } catch (err) {
     console.error('Erro ao carregar filtros:', err)
     store.error = 'Erro ao carregar opções de filtro.'
@@ -84,101 +137,91 @@ onMounted(async () => {
 </script>
 
 <template>
-<AppShell>
+  <AppShell>
+    <div class="page">
+      <h2>Leads</h2>
 
-  <div class="page">
+      <div class="filters-bar">
+        <div v-if="filtersLoading" class="loading">
+          Carregando filtros...
+        </div>
 
-    <h2>Leads</h2>
+        <div v-else-if="Object.keys(filterOptions).length === 0" class="empty">
+          Nenhuma opção de filtro disponível.
+        </div>
 
-    <div class="filters-bar">
+        <div v-else class="filter-group">
+          <SearchSelect
+            v-for="item in filterOrder"
+            :key="item.key"
+            v-model="filters[item.key]"
+            :options="(filterOptions[item.optionsKey] || []).map(o => o._id)"
+            :placeholder="item.label"
+            multiple
+          />
+        </div>
 
-      <div v-if="filtersLoading" class="loading">
-        Carregando filtros...
+        <div class="action-buttons">
+          <button
+            class="btn-primary"
+            @click="loadLeads"
+            :disabled="store.loading"
+          >
+            Filtrar
+          </button>
+
+          <button
+            class="btn-outline"
+            @click="showModal = true"
+          >
+            Exportar
+          </button>
+        </div>
       </div>
 
-      <div v-else-if="Object.keys(filterOptions).length === 0" class="empty">
-        Nenhuma opção de filtro disponível.
+      <p class="total">
+        Total: {{ store.total }}
+      </p>
+
+      <div class="table-container" v-if="store.leads.length">
+        <table>
+          <thead>
+            <tr>
+              <th v-for="col in fixedColumns" :key="col">
+                {{ col.replace(/_/g,' ').toUpperCase() }}
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr v-for="lead in store.leads" :key="lead._id">
+              <td v-for="col in fixedColumns" :key="col">
+                {{ lead[col] ?? '—' }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <div v-else class="filter-group">
-        <SearchSelect
-          v-for="item in filterOrder"
-          :key="item.key"
-          v-model="filters[item.key]"
-          :options="filterOptions[item.optionsKey] || []"
-          :placeholder="item.label"
-          multiple
-        />
+      <div v-if="store.loading" class="loading">
+        Carregando leads...
       </div>
 
-      <div class="action-buttons">
-        <button
-          class="btn-primary"
-          @click="loadLeads"
-          :disabled="store.loading"
-        >
-          Filtrar
-        </button>
+      <p v-if="store.error" class="error">
+        {{ store.error }}
+      </p>
 
-        <button
-          class="btn-outline"
-          @click="showModal = true"
-        >
-          Exportar
-        </button>
-      </div>
-
+      <ExportModal
+        v-if="showModal"
+        @close="showModal = false"
+        @submit="handleExport"
+      />
     </div>
-
-    <p class="total">
-      Total: {{ store.total }}
-    </p>
-
-    <div class="table-container" v-if="store.leads.length">
-
-      <table>
-        <thead>
-          <tr>
-            <th v-for="col in fixedColumns" :key="col">
-              {{ col.replace(/_/g,' ').toUpperCase() }}
-            </th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr v-for="lead in store.leads" :key="lead._id">
-            <td v-for="col in fixedColumns" :key="col">
-              {{ lead[col] ?? '—' }}
-            </td>
-          </tr>
-        </tbody>
-
-      </table>
-
-    </div>
-
-    <div v-if="store.loading" class="loading">
-      Carregando leads...
-    </div>
-
-    <p v-if="store.error" class="error">
-      {{ store.error }}
-    </p>
-
-    <ExportModal
-      v-if="showModal"
-      @close="showModal = false"
-      @export="handleExport"
-    />
-
-  </div>
-
-</AppShell>
+  </AppShell>
 </template>
 
-<!-- styles mantidos iguais – não repeti aqui -->
-
 <style scoped>
+/* SEUS STYLES MANTIDOS */
 .page {
   padding: 40px 32px;
   background: var(--bg-primary);
@@ -193,7 +236,6 @@ h2 {
   letter-spacing: -0.5px;
 }
 
-/* Filtros - cards com mais espaço e hover */
 .filters-bar {
   background: var(--bg-card);
   border-radius: 16px;
@@ -206,11 +248,10 @@ h2 {
 .filter-group {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 32px; /* mais espaço entre filtros */
+  gap: 32px;
   margin-bottom: 32px;
 }
 
-/* Botões maiores e mais destacados */
 .action-buttons {
   display: flex;
   gap: 20px;
@@ -258,7 +299,6 @@ h2 {
   transform: translateY(-3px);
 }
 
-/* Total destacado */
 .total {
   font-size: 1.5rem;
   font-weight: 700;
@@ -271,7 +311,6 @@ h2 {
   border: 1px solid rgba(255, 106, 0, 0.2);
 }
 
-/* Tabela com contraste melhorado */
 .table-container {
   background: var(--bg-card);
   border-radius: 16px;
@@ -316,7 +355,6 @@ tr:hover td {
   background: rgba(255, 106, 0, 0.08);
 }
 
-/* Loading e erro mais visíveis */
 .loading, .empty {
   text-align: center;
   padding: 80px 20px;
@@ -333,7 +371,6 @@ tr:hover td {
   font-size: 1.2rem;
 }
 
-/* Responsivo */
 @media (max-width: 1024px) {
   .filter-group {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -343,10 +380,7 @@ tr:hover td {
 @media (max-width: 768px) {
   .page { padding: 24px 16px; }
   h2 { font-size: 1.9rem; }
-  .filters-bar {
-  display: grid;
-  gap: 22px;
-}
+  .filters-bar { display: grid; gap: 22px; }
   .filter-group { gap: 20px; }
   .action-buttons { flex-direction: column; gap: 12px; }
   table { font-size: 13px; }
