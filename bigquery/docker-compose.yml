@@ -1,0 +1,28 @@
+version: "3.8"
+
+networks:
+  ativaai:
+    external: true
+
+services:
+
+  backend-leads:
+    build: ./backend-nest
+    container_name: backend-leads
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      MONGO_URI: mongodb://admin:hnjQ9LChw773iMNmFCjLuSGBZd00gKeBY7f1fke4O@mongo:27017/bigquery?authSource=admin
+    expose:
+      - "3000"
+    networks:
+      - ativaai
+
+  frontend-leads:
+    build: ./frontend
+    container_name: frontend-leads
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - ativaai
