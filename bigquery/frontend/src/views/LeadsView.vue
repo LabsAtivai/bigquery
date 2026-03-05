@@ -64,6 +64,7 @@ const filters = reactive<Record<FilterKey, string[]>>({
  * ✅ options tipadas (cada opção vem como { _id, count } no backend)
  */
 type AggItem = { _id: string; count: number }
+
 const filterOptions = ref<Record<FilterOptionsKey, AggItem[]>>({
   setores: [],
   estados: [],
@@ -87,15 +88,13 @@ type ExportMeta = {
 }
 
 function handleExport(meta: ExportMeta) {
-  // ✅ exportLeads abre uma nova aba/janela (window.open)
-  // então não tem ok/message pra tratar aqui.
+  // exportLeads abre uma nova aba/janela (window.open)
   exportLeads({
     ...filters,
     ...meta,
     page: undefined,
     limit: undefined,
   })
-
   showModal.value = false
 }
 
@@ -103,7 +102,6 @@ async function loadFilters() {
   filtersLoading.value = true
   try {
     const { data } = await getFilters(filters)
-    // backend retorna: { setores, estados, cidades, paises, tamanhos, cargos, clientes }
     filterOptions.value = {
       setores: data?.setores ?? [],
       estados: data?.estados ?? [],
@@ -140,27 +138,23 @@ onMounted(async () => {
   <AppShell>
     <div class="page">
       <h2>Leads</h2>
-
       <div class="filters-bar">
         <div v-if="filtersLoading" class="loading">
           Carregando filtros...
         </div>
-
         <div v-else-if="Object.keys(filterOptions).length === 0" class="empty">
           Nenhuma opção de filtro disponível.
         </div>
-
         <div v-else class="filter-group">
           <SearchSelect
             v-for="item in filterOrder"
             :key="item.key"
             v-model="filters[item.key]"
-            :options="(filterOptions[item.optionsKey] || []).map(o => o._id)"
+            :options="filterOptions[item.optionsKey] || []"
             :placeholder="item.label"
             multiple
           />
         </div>
-
         <div class="action-buttons">
           <button
             class="btn-primary"
@@ -169,7 +163,6 @@ onMounted(async () => {
           >
             Filtrar
           </button>
-
           <button
             class="btn-outline"
             @click="showModal = true"
@@ -178,11 +171,9 @@ onMounted(async () => {
           </button>
         </div>
       </div>
-
       <p class="total">
         Total: {{ store.total }}
       </p>
-
       <div class="table-container" v-if="store.leads.length">
         <table>
           <thead>
@@ -192,7 +183,6 @@ onMounted(async () => {
               </th>
             </tr>
           </thead>
-
           <tbody>
             <tr v-for="lead in store.leads" :key="lead._id">
               <td v-for="col in fixedColumns" :key="col">
@@ -202,15 +192,12 @@ onMounted(async () => {
           </tbody>
         </table>
       </div>
-
       <div v-if="store.loading" class="loading">
         Carregando leads...
       </div>
-
       <p v-if="store.error" class="error">
         {{ store.error }}
       </p>
-
       <ExportModal
         v-if="showModal"
         @close="showModal = false"
