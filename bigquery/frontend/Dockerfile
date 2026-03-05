@@ -3,17 +3,9 @@
 # =====================
 FROM node:20-alpine AS build
 WORKDIR /app
-
-# Copia package primeiro (melhor cache)
 COPY package*.json ./
 RUN npm ci
-
-# Copia todo o código
 COPY . .
-
-# Debug: mostra o que realmente foi copiado
-RUN ls -la
-
 RUN npm run build
 
 # =====================
@@ -21,9 +13,6 @@ RUN npm run build
 # =====================
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-
-# Adiciona config customizada com fallback SPA
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
+COPY nginx.conf /etc/nginx/conf.d/default.conf  # ← Adicione isso
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
