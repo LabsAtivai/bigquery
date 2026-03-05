@@ -6,7 +6,7 @@ async function bootstrap() {
 
   app.enableCors({
   origin: [
-    'https://leads.labsativa.com.br',
+    'https://bigquery.labsativa.com.br',
     'http://localhost:5173'
   ],
   credentials: true,
