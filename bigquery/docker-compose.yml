@@ -5,9 +5,9 @@ networks:
     external: true
 
 services:
-
   backend-leads:
-    build: ./backend-nest
+    build:
+      context: ./backend-nest
     container_name: backend-leads
     restart: unless-stopped
     environment:
@@ -19,7 +19,8 @@ services:
       - ativaai
 
   frontend-leads:
-    build: ./frontend
+    build:
+      context: ./frontend
     container_name: frontend-leads
     restart: unless-stopped
     expose:
