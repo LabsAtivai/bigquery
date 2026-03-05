@@ -3,7 +3,7 @@ import axios from 'axios'
 
 const baseURL =
   import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? '' : 'http://api-leads.labsativa.com.br')
+  (import.meta.env.PROD ? '' : 'https://api-leads.labsativa.com.br/')
 
 const http = axios.create({
   baseURL,
