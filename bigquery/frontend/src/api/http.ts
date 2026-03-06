@@ -1,20 +1,18 @@
-// src/api/http.ts
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_URL || '/api'  // força /api em todos os ambientes
+const baseURL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD
+    ? 'http://api-leads.labsativa.com.br/api'
+    : 'http://localhost:3000')
 
-const http = axios.create({
-  baseURL,
-  // Opcional: timeout maior se o backend demorar
-  timeout: 30000,
-})
+const http = axios.create({ baseURL })
 
 http.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error('API error:', error)
-    // Opcional: tratar 401/403 aqui (ex: logout)
-    return Promise.reject(error)
+  (r) => r,
+  (e) => {
+    console.error('API error:', e)
+    return Promise.reject(e)
   }
 )
 
