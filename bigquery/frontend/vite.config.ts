@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/': {
-        target: 'http://api-leads.labsativa.com.br',
+        target: 'https://api-leads.labsativa.com.br',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/api/, ''),
       },

@@ -19,11 +19,13 @@ services:
       - ativaai
 
   frontend-leads:
-    build:
-      context: ./frontend
-    container_name: frontend-leads
-    restart: unless-stopped
-    expose:
-      - "80"
-    networks:
-      - ativaai
+  build:
+    context: ./frontend
+    args:
+      VITE_API_URL: https://api-leads.labsativa.com.br/api
+  container_name: frontend-leads
+  restart: unless-stopped
+  expose:
+    - "80"
+  networks:
+    - ativaai
