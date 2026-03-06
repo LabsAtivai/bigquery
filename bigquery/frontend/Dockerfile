@@ -13,6 +13,7 @@ RUN npm run build
 # =====================
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf 
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+RUN rm -f /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh  # Remove o script que duplica location /
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
