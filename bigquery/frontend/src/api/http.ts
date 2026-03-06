@@ -1,7 +1,7 @@
 // src/api/http.ts
 import axios from 'axios'
 
-const baseURL = import.meta.env.VITE_API_URL || '/'  // força /api em todos os ambientes
+const baseURL = import.meta.env.VITE_API_URL || '/api'  // força /api em todos os ambientes
 
 const http = axios.create({
   baseURL,
