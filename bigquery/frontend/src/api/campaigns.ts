@@ -6,6 +6,6 @@ export function getCampaigns(params: any) {
 }
 
 export function downloadCampaign(id: string, format: 'csv' | 'xlsx') {
-  const base = http.defaults.baseURL || 'http://localhost:3000'
+  const base = http.defaults.baseURL || 'http://api-leads.labsativa.com.br'
   window.open(`${base}/campaigns/${id}/export?format=${format}`)
 }
