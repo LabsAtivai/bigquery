@@ -84,7 +84,7 @@ type ExportMeta = {
   downloadedBy: string
   clientName: string
   setorInformado: string
-  user: string
+  user?: string
 }
 
 async function handleExport(meta: ExportMeta) {
