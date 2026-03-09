@@ -13,27 +13,6 @@ export class LeadsService {
     private campaignsService: CampaignsService,
   ) {}
 
-  private readonly EXPORT_FIELDS = [
-    'email',
-    'nome',
-    'nome_completo',
-    'linkedin',
-    'cargo',
-    'pais',
-    'localizacao',
-    'empresa',
-    'url_empresa',
-    'tamanho',
-    'pais_empresa',
-    'localizacao_empresa',
-    'estado_empresa',
-    'cidade_empresa',
-    'setor_empresa',
-  ]
-
-  // ==========================
-  // Helpers
-  // ==========================
   private getQueryRaw(query: any, key: string) {
     if (!query) return undefined
     return query[key] ?? query[`${key}[]`]
@@ -50,10 +29,7 @@ export class LeadsService {
     const s = String(raw).trim()
     if (!s) return []
 
-    return s
-      .split(',')
-      .map((x) => x.trim())
-      .filter(Boolean)
+    return s.split(',').map((x) => x.trim()).filter(Boolean)
   }
 
   private normalizeNumber(raw: any, fallback: number) {
@@ -62,8 +38,9 @@ export class LeadsService {
   }
 
   private normalizeLeadsQuery(query: any) {
-    return {
+    const normalized = {
       ...query,
+
       setor_empresa: this.normalizeArrayFromQuery(query, 'setor_empresa'),
       estado_empresa: this.normalizeArrayFromQuery(query, 'estado_empresa'),
       cidade_empresa: this.normalizeArrayFromQuery(query, 'cidade_empresa'),
@@ -71,9 +48,12 @@ export class LeadsService {
       tamanho: this.normalizeArrayFromQuery(query, 'tamanho'),
       cargo: this.normalizeArrayFromQuery(query, 'cargo'),
       client: this.normalizeArrayFromQuery(query, 'client'),
+
       page: this.normalizeNumber(query?.page, 1),
       limit: this.normalizeNumber(query?.limit, 50),
     }
+
+    return normalized
   }
 
   private removeFieldFromQuery(query: any, field: string) {
@@ -121,50 +101,6 @@ export class LeadsService {
     return needsQuotes ? `"${escaped}"` : escaped
   }
 
-  private sanitizeFilename(value: string, ext: 'xlsx' | 'csv') {
-    const safe =
-      String(value || 'export')
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, '-')
-        .replace(/[^\w\-]+/g, '') || 'export'
-
-    return `${safe}-${Date.now()}.${ext}`
-  }
-
-  private ensureExportHeaders(res: Response) {
-    // importante para o frontend ler content-disposition via axios
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition')
-  }
-
-  private pickExportFields(lead: any) {
-    const obj: any = {}
-
-    this.EXPORT_FIELDS.forEach((field) => {
-      obj[field] = lead?.[field] ?? ''
-    })
-
-    return obj
-  }
-
-  private async sendDownload(res: Response, filepath: string, filename: string) {
-    this.ensureExportHeaders(res)
-
-    return new Promise<void>((resolve, reject) => {
-      res.download(filepath, filename, (err) => {
-        if (err) {
-          console.error('[EXPORT] erro ao enviar arquivo:', err)
-          reject(err)
-          return
-        }
-        resolve()
-      })
-    })
-  }
-
-  // ==========================
-  // GET /leads/filters
-  // ==========================
   async getFilters(query: any) {
     const db = this.mongoService.getDb()
     const normalized = this.normalizeLeadsQuery(query)
@@ -208,9 +144,6 @@ export class LeadsService {
     return { setores, estados, cidades, paises, tamanhos, cargos, clientes }
   }
 
-  // ==========================
-  // GET /leads
-  // ==========================
   async findAll(query: any) {
     const db = this.mongoService.getDb()
     const normalized = this.normalizeLeadsQuery(query)
@@ -220,6 +153,7 @@ export class LeadsService {
     const skip = (page - 1) * limit
 
     const filter = this.buildMongoFilter(normalized)
+
     const total = await db.collection('leads').countDocuments(filter)
 
     const data = await db
@@ -238,9 +172,6 @@ export class LeadsService {
     }
   }
 
-  // ==========================
-  // GET /leads/export?format=xlsx|csv
-  // ==========================
   async export(query: any, res: Response) {
     const normalized = this.normalizeLeadsQuery(query)
     const format = String(query.format || 'xlsx').toLowerCase()
@@ -251,21 +182,31 @@ export class LeadsService {
 
   async exportXLSX(query: any, res: Response) {
     const db = this.mongoService.getDb()
-    const filter = this.buildMongoFilter(query)
 
+    const filter = this.buildMongoFilter(query)
     const leads = await db.collection('leads').find(filter).toArray()
 
-    if (!leads.length) {
+    if (!leads.length)
       return res.status(404).json({ message: 'Nenhum lead encontrado' })
-    }
 
-    const cleaned = leads.map((lead) => this.pickExportFields(lead))
+    const cleaned = leads.map((lead) => {
+      const { _id, ...rest } = lead || {}
+      return rest
+    })
 
     const today = new Date().toISOString().split('T')[0]
     const exportDir = path.join(process.cwd(), 'exports', today)
     if (!fs.existsSync(exportDir)) fs.mkdirSync(exportDir, { recursive: true })
 
-    const filename = this.sanitizeFilename(query.campaignName || 'export', 'xlsx')
+    const filename =
+      (query.campaignName || 'export')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-') +
+      '-' +
+      Date.now() +
+      '.xlsx'
+
     const filepath = path.join(exportDir, filename)
 
     const worksheet = XLSX.utils.json_to_sheet(cleaned)
@@ -275,7 +216,7 @@ export class LeadsService {
 
     await this.campaignsService.createCampaign({
       name: query.campaignName || 'Export',
-      client: query.clientName || null,
+      client: query.clientName || query.client?.[0] || null,
       created_by: query.user || 'sistema',
       filters: this.sanitizeCampaignFilters(query),
       leads_count: cleaned.length,
@@ -286,20 +227,45 @@ export class LeadsService {
       },
     })
 
-    return this.sendDownload(res, filepath, filename)
+    return res.download(filepath)
   }
+
+  private readonly EXPORT_FIELDS = [
+    'email',
+    'nome',
+    'nome_completo',
+    'linkedin',
+    'cargo',
+    'pais',
+    'localizacao',
+    'empresa',
+    'url_empresa',
+    'tamanho',
+    'pais_empresa',
+    'localizacao_empresa',
+    'estado_empresa',
+    'cidade_empresa',
+    'setor_empresa',
+  ]
 
   async exportCSV(query: any, res: Response) {
     const db = this.mongoService.getDb()
-    const filter = this.buildMongoFilter(query)
 
+    const filter = this.buildMongoFilter(query)
     const leads = await db.collection('leads').find(filter).toArray()
 
-    if (!leads.length) {
+    if (!leads.length)
       return res.status(404).json({ message: 'Nenhum lead encontrado' })
-    }
 
-    const cleaned = leads.map((lead) => this.pickExportFields(lead))
+    const cleaned = leads.map((lead) => {
+      const obj: any = {}
+
+      this.EXPORT_FIELDS.forEach((field) => {
+        obj[field] = lead?.[field] ?? ''
+      })
+
+      return obj
+    })
 
     const keys = this.EXPORT_FIELDS
     const header = keys.join(';')
@@ -312,14 +278,21 @@ export class LeadsService {
     const exportDir = path.join(process.cwd(), 'exports', today)
     if (!fs.existsSync(exportDir)) fs.mkdirSync(exportDir, { recursive: true })
 
-    const filename = this.sanitizeFilename(query.campaignName || 'export', 'csv')
-    const filepath = path.join(exportDir, filename)
+    const filename =
+      (query.campaignName || 'export')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '-') +
+      '-' +
+      Date.now() +
+      '.csv'
 
+    const filepath = path.join(exportDir, filename)
     fs.writeFileSync(filepath, csv, 'utf-8')
 
     await this.campaignsService.createCampaign({
       name: query.campaignName || 'Export',
-      client: query.clientName || null,
+      client: query.clientName || query.client?.[0] || null,
       created_by: query.user || 'sistema',
       filters: this.sanitizeCampaignFilters(query),
       leads_count: cleaned.length,
@@ -330,6 +303,6 @@ export class LeadsService {
       },
     })
 
-    return this.sendDownload(res, filepath, filename)
+    return res.download(filepath)
   }
 }
