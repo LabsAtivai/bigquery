@@ -88,7 +88,6 @@ type ExportMeta = {
 }
 
 function handleExport(meta: ExportMeta) {
-  // exportLeads abre uma nova aba/janela (window.open)
   exportLeads({
     ...filters,
     ...meta,
@@ -97,7 +96,6 @@ function handleExport(meta: ExportMeta) {
   })
   showModal.value = false
 }
-
 async function loadFilters() {
   filtersLoading.value = true
   try {
@@ -198,11 +196,11 @@ onMounted(async () => {
       <p v-if="store.error" class="error">
         {{ store.error }}
       </p>
-      <ExportModal
-        v-if="showModal"
-        @close="showModal = false"
-        @submit="handleExport"
-      />
+     <ExportModal
+  v-if="showModal"
+  @close="showModal = false"
+  @submit="handleExport"
+/>
     </div>
   </AppShell>
 </template>
