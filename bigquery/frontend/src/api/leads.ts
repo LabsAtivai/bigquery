@@ -2,7 +2,6 @@ import http from './http'
 
 function buildQuery(params: any) {
   const query = new URLSearchParams()
-
   Object.entries(params || {}).forEach(([k, v]: any) => {
     if (Array.isArray(v)) {
       v.forEach((vv) => {
@@ -14,7 +13,6 @@ function buildQuery(params: any) {
       query.append(k, String(v))
     }
   })
-
   return query.toString()
 }
 
@@ -31,22 +29,13 @@ export function getFilters(params: any) {
 function getFilenameFromHeaders(headers: any) {
   const cd = headers?.['content-disposition'] || headers?.['Content-Disposition']
   if (!cd) return null
-
-  const utf8Match = /filename\*=UTF-8''([^;\n]+)/i.exec(cd)
-  if (utf8Match?.[1]) {
-    try {
-      return decodeURIComponent(utf8Match[1].trim())
-    } catch {
-      return utf8Match[1].trim()
-    }
+  const match = /filename\*?=(?:UTF-8''|")?([^";\n]+)/i.exec(cd)
+  if (!match?.[1]) return null
+  try {
+    return decodeURIComponent(match[1].replace(/"/g, '').trim())
+  } catch {
+    return match[1].replace(/"/g, '').trim()
   }
-
-  const simpleMatch = /filename="?([^";\n]+)"?/i.exec(cd)
-  if (simpleMatch?.[1]) {
-    return simpleMatch[1].trim()
-  }
-
-  return null
 }
 
 function fallbackFilename(params: any) {
@@ -55,7 +44,6 @@ function fallbackFilename(params: any) {
     .trim()
     .replace(/\s+/g, '-')
     .replace(/[^\w\-]+/g, '')
-
   const format = params?.format === 'csv' ? 'csv' : 'xlsx'
   return `${name}.${format}`
 }
@@ -73,7 +61,6 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export async function exportLeads(params: any) {
   const q = buildQuery(params)
-
   try {
     const resp = await http.get(`/leads/export?${q}`, {
       responseType: 'blob',
@@ -82,32 +69,19 @@ export async function exportLeads(params: any) {
     const filename = getFilenameFromHeaders(resp.headers) || fallbackFilename(params)
     downloadBlob(resp.data, filename)
 
-    return { ok: true, message: 'Exportação concluída com sucesso.' }
+    return { ok: true }
   } catch (err: any) {
+    // Tenta ler erro JSON vindo como blob (ex: 404 Nenhum lead encontrado)
     const blob = err?.response?.data
-
     if (blob instanceof Blob) {
       try {
         const text = await blob.text()
         const json = JSON.parse(text)
-        return {
-          ok: false,
-          status: err?.response?.status,
-          message: json?.message || 'Falha ao exportar',
-        }
+        return { ok: false, status: err?.response?.status, message: json?.message || text }
       } catch {
-        return {
-          ok: false,
-          status: err?.response?.status,
-          message: 'Falha ao exportar',
-        }
+        return { ok: false, status: err?.response?.status, message: 'Falha ao exportar' }
       }
     }
-
-    return {
-      ok: false,
-      status: err?.response?.status,
-      message: err?.message || 'Falha ao exportar',
-    }
+    return { ok: false, status: err?.response?.status, message: err?.message || 'Falha ao exportar' }
   }
 }

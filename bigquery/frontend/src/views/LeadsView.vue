@@ -87,14 +87,18 @@ type ExportMeta = {
   user: string
 }
 
-function handleExport(meta: ExportMeta) {
-  exportLeads({
+async function handleExport(meta: ExportMeta) {
+  const result = await exportLeads({
     ...filters,
     ...meta,
-    page: undefined,
-    limit: undefined,
   })
-  showModal.value = false
+
+  if (result.ok) {
+    showModal.value = false
+    return
+  }
+
+  store.error = result.message || 'Falha ao exportar'
 }
 async function loadFilters() {
   filtersLoading.value = true
@@ -196,11 +200,11 @@ onMounted(async () => {
       <p v-if="store.error" class="error">
         {{ store.error }}
       </p>
-     <ExportModal
-  v-if="showModal"
-  @close="showModal = false"
-  @submit="handleExport"
-/>
+      <ExportModal
+        v-if="showModal"
+        @close="showModal = false"
+        @submit="handleExport"
+      />
     </div>
   </AppShell>
 </template>
