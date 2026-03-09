@@ -61,11 +61,11 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export async function exportLeads(params: any) {
   const q = buildQuery(params)
+
   try {
-    const resp = await http.get('/leads/export', {
-  params,
-  responseType: 'blob'
-})
+    const resp = await http.get(`/leads/export?${q}`, {
+      responseType: 'blob',
+    })
 
     const filename = getFilenameFromHeaders(resp.headers) || fallbackFilename(params)
     downloadBlob(resp.data, filename)
