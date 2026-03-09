@@ -203,7 +203,7 @@ onMounted(async () => {
       <ExportModal
         v-if="showModal"
         @close="showModal = false"
-        @submit="handleExport"
+        @export="handleExport"
       />
     </div>
   </AppShell>
