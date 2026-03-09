@@ -60,11 +60,10 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export async function exportLeads(params: any) {
-  const q = buildQuery(params)
-
   try {
-    const resp = await http.get(`/leads/export?${q}`, {
-      responseType: 'blob',
+    const resp = await http.get('/leads/export', {
+      params,
+      responseType: 'blob'
     })
 
     const filename = getFilenameFromHeaders(resp.headers) || fallbackFilename(params)
@@ -72,8 +71,8 @@ export async function exportLeads(params: any) {
 
     return { ok: true }
   } catch (err: any) {
-    // Tenta ler erro JSON vindo como blob (ex: 404 Nenhum lead encontrado)
     const blob = err?.response?.data
+
     if (blob instanceof Blob) {
       try {
         const text = await blob.text()
@@ -83,6 +82,7 @@ export async function exportLeads(params: any) {
         return { ok: false, status: err?.response?.status, message: 'Falha ao exportar' }
       }
     }
+
     return { ok: false, status: err?.response?.status, message: err?.message || 'Falha ao exportar' }
   }
 }
