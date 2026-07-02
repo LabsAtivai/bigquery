@@ -35,6 +35,15 @@ export function getFilters(params: any) {
 }
 
 /**
+ * Buscar valores de um campo de filtro por texto digitado (autocomplete
+ * server-side, não se limita ao top-200 por frequência)
+ */
+export function searchFilterField(field: string, term: string, params: any = {}) {
+  const q = buildQuery({ ...params, q: term })
+  return http.get(`/leads/filters/${field}?${q}`)
+}
+
+/**
  * Extrair filename do header Content-Disposition
  */
 function getFilenameFromHeaders(headers: any) {

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Res, HttpException, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Param, Query, Res, HttpException, HttpStatus } from '@nestjs/common'
 import { LeadsService } from './leads.service'
 import type { Response } from 'express'
 
@@ -22,6 +22,20 @@ export class LeadsController {
       return await this.leadsService.getFilters(query)
     } catch (err) {
       throw new HttpException('Erro ao carregar filtros', HttpStatus.INTERNAL_SERVER_ERROR)
+    }
+  }
+
+  @Get('filters/:field')
+  async searchFilterField(
+    @Param('field') field: string,
+    @Query('q') q: string,
+    @Query() query: any,
+  ) {
+    try {
+      return await this.leadsService.searchFieldValues(field, q, query)
+    } catch (err) {
+      if (err instanceof HttpException) throw err
+      throw new HttpException('Erro ao buscar valores do filtro', HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 

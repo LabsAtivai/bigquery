@@ -2,7 +2,7 @@
 import { reactive, ref, onMounted } from 'vue'
 import AppShell from '../components/AppShell.vue'
 import { useLeadsStore } from '../stores/leads.store'
-import { getFilters, exportLeads } from '../api/leads'
+import { getFilters, exportLeads, searchFilterField } from '../api/leads'
 import SearchSelect from '../components/SearchSelect.vue'
 import ExportModal from '../components/ExportModal.vue'
 
@@ -31,15 +31,29 @@ type FilterOptionsKey =
   | 'cargos'
   | 'clientes'
 
-const filterOrder: Array<{ key: FilterKey; label: string; optionsKey: FilterOptionsKey }> = [
+const filterOrder: Array<{ key: FilterKey; label: string; optionsKey: FilterOptionsKey; remoteSearch?: boolean }> = [
   { key: 'setor_empresa', label: 'Setor', optionsKey: 'setores' },
   { key: 'estado_empresa', label: 'Estado', optionsKey: 'estados' },
   { key: 'cidade_empresa', label: 'Cidade', optionsKey: 'cidades' },
   { key: 'pais_empresa', label: 'País', optionsKey: 'paises' },
   { key: 'tamanho', label: 'Porte', optionsKey: 'tamanhos' },
-  { key: 'cargo', label: 'Cargo', optionsKey: 'cargos' },
+  { key: 'cargo', label: 'Cargo', optionsKey: 'cargos', remoteSearch: true },
   { key: 'client', label: 'Cliente', optionsKey: 'clientes' },
 ]
+
+/**
+ * ✅ cargo tem cauda longa de variações (texto livre); busca no backend
+ * em vez de depender só do top-200 pré-carregado
+ */
+async function searchCargo(term: string) {
+  try {
+    const { data } = await searchFilterField('cargo', term, filters)
+    return data || []
+  } catch (err) {
+    console.error('Erro ao buscar cargos:', err)
+    return []
+  }
+}
 
 const fixedColumns = [
   'email','nome','nome_completo','linkedin','cargo',
@@ -154,6 +168,7 @@ onMounted(async () => {
             v-model="filters[item.key]"
             :options="filterOptions[item.optionsKey] || []"
             :placeholder="item.label"
+            :on-search="item.remoteSearch ? searchCargo : undefined"
             multiple
           />
         </div>

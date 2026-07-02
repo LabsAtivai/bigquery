@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common'
 import { MongoService } from '../mongo/mongo.service'
 import { CampaignsService } from '../campaigns/campaigns.service'
 import type { Response } from 'express'
@@ -101,26 +101,40 @@ export class LeadsService {
     return needsQuotes ? `"${escaped}"` : escaped
   }
 
+  private readonly FILTERABLE_FIELDS = [
+    'setor_empresa',
+    'estado_empresa',
+    'cidade_empresa',
+    'pais_empresa',
+    'tamanho',
+    'cargo',
+    'client',
+  ]
+
+  private escapeRegex(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  }
+
+  private baseFilterExcluding(normalized: any, excludeField?: string) {
+    let q = { ...normalized }
+
+    if (excludeField) {
+      q = this.removeFieldFromQuery(q, excludeField)
+      ;(q as any)[excludeField] = []
+    }
+
+    return this.buildMongoFilter(q)
+  }
+
   async getFilters(query: any) {
     const db = this.mongoService.getDb()
     const normalized = this.normalizeLeadsQuery(query)
-
-    const baseFilter = (excludeField?: string) => {
-      let q = { ...normalized }
-
-      if (excludeField) {
-        q = this.removeFieldFromQuery(q, excludeField)
-        ;(q as any)[excludeField] = []
-      }
-
-      return this.buildMongoFilter(q)
-    }
 
     const aggregateField = async (field: string) => {
       const result = await db
         .collection('leads')
         .aggregate([
-          { $match: baseFilter(field) },
+          { $match: this.baseFilterExcluding(normalized, field) },
           { $group: { _id: `$${field}`, count: { $sum: 1 } } },
           { $sort: { count: -1 } },
           { $limit: 200 },
@@ -142,6 +156,40 @@ export class LeadsService {
       ])
 
     return { setores, estados, cidades, paises, tamanhos, cargos, clientes }
+  }
+
+  /**
+   * Busca valores distintos de um campo de filtro por texto digitado,
+   * sem se limitar ao top-200 por frequência (usado pelo autocomplete
+   * de cargos, que tem alta cardinalidade e cauda longa).
+   */
+  async searchFieldValues(field: string, q: string, query: any) {
+    if (!this.FILTERABLE_FIELDS.includes(field)) {
+      throw new HttpException('Campo de filtro inválido', HttpStatus.BAD_REQUEST)
+    }
+
+    const db = this.mongoService.getDb()
+    const normalized = this.normalizeLeadsQuery(query)
+    const term = String(q || '').trim()
+
+    const pipeline: any[] = [
+      { $match: this.baseFilterExcluding(normalized, field) },
+    ]
+
+    if (term) {
+      pipeline.push({
+        $match: { [field]: { $regex: this.escapeRegex(term), $options: 'i' } },
+      })
+    }
+
+    pipeline.push(
+      { $group: { _id: `$${field}`, count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 50 },
+    )
+
+    const result = await db.collection('leads').aggregate(pipeline).toArray()
+    return result.filter((x: any) => x._id && String(x._id).trim() !== 'NAN')
   }
 
   async findAll(query: any) {

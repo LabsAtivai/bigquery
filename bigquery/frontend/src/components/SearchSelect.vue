@@ -9,6 +9,7 @@ const props = defineProps<{
   placeholder?: string
   disabled?: boolean
   multiple?: boolean
+  onSearch?: (term: string) => Promise<Opt[]>
 }>()
 
 const emit = defineEmits<{
@@ -18,6 +19,9 @@ const emit = defineEmits<{
 const open = ref(false)
 const query = ref('')
 const root = ref<HTMLElement | null>(null)
+const remoteResults = ref<Opt[]>([])
+const searching = ref(false)
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 const safeModelValue = computed(() => {
   if (props.multiple) return Array.isArray(props.modelValue) ? props.modelValue : []
@@ -33,8 +37,37 @@ watch(
 
 const selectedLabels = computed(() => props.multiple ? safeModelValue.value : [])
 
+watch(query, (q) => {
+  if (!props.onSearch) return
+
+  const term = q.trim()
+  if (debounceTimer) clearTimeout(debounceTimer)
+
+  if (!term) {
+    remoteResults.value = []
+    return
+  }
+
+  debounceTimer = setTimeout(async () => {
+    searching.value = true
+    try {
+      remoteResults.value = await props.onSearch!(term)
+    } catch {
+      remoteResults.value = []
+    } finally {
+      searching.value = false
+    }
+  }, 300)
+})
+
 const filtered = computed(() => {
   const q = (query.value || '').trim().toLowerCase()
+
+  if (props.onSearch) {
+    if (!q) return (props.options || []).slice(0, 40)
+    return remoteResults.value.slice(0, 40)
+  }
+
   const base = props.options || []
   if (!q) return base.slice(0, 40)
   return base.filter(o => (o._id || '').toLowerCase().includes(q)).slice(0, 40)
@@ -77,10 +110,18 @@ function onFocus() { open.value = true }
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') open.value = false
   if (e.key === 'Enter') {
-    const exact = props.options?.find(o => (o._id || '').toLowerCase() === query.value.trim().toLowerCase())
-    if (exact) selectValue(exact._id)
-    else {
-      emit('update:modelValue', query.value.trim())
+    const term = query.value.trim()
+    if (!term) return
+
+    const pool = props.onSearch ? remoteResults.value : props.options
+    const exact = pool?.find(o => (o._id || '').toLowerCase() === term.toLowerCase())
+
+    if (exact) {
+      selectValue(exact._id)
+    } else if (props.multiple) {
+      selectValue(term)
+    } else {
+      emit('update:modelValue', term)
       open.value = false
     }
   }
