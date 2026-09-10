@@ -141,7 +141,11 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
       <div v-if="props.multiple && selectedLabels.length" class="selected-badges">
         <span v-for="label in selectedLabels" :key="label" class="badge">
           {{ label }}
-          <button class="badge-remove" @click="removeSelected(label)">×</button>
+          <button
+            class="badge-remove"
+            :aria-label="`Remover ${label}`"
+            @click="removeSelected(label)"
+          >×</button>
         </span>
       </div>
 
@@ -157,6 +161,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
       <button
         v-if="(modelValue || query) && !disabled"
         class="ss-clear"
+        aria-label="Limpar seleção"
         @click="clear"
         title="Limpar"
       >×</button>

@@ -10,6 +10,7 @@ export const useLeadsStore = defineStore('leads', {
     limit: 50,
     loading: false,
     error: '' as string,
+    exportError: '' as string,
     filterOptions: {} as Record<string, { _id: string; count: number }[]>,
     filtersLoading: false,
   }),
@@ -37,6 +38,31 @@ export const useLeadsStore = defineStore('leads', {
       } finally {
         this.loading = false
       }
+    },
+
+    /** Reseta para a primeira página ao aplicar um novo conjunto de filtros */
+    async applyFilters(filters: any) {
+      this.page = 1
+      await this.fetchLeads(filters)
+    },
+
+    async goToPage(page: number, filters: any) {
+      if (page < 1) return
+      if (this.totalPages && page > this.totalPages) return
+      this.page = page
+      await this.fetchLeads(filters)
+    },
+
+    setExportError(message: string) {
+      this.exportError = message
+    },
+
+    clearExportError() {
+      this.exportError = ''
+    },
+
+    setError(message: string) {
+      this.error = message
     },
 
     async fetchFilters(filters: any) {

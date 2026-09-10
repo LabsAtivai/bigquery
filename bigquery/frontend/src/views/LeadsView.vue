@@ -2,13 +2,15 @@
 import { reactive, ref, onMounted } from 'vue'
 import AppShell from '../components/AppShell.vue'
 import { useLeadsStore } from '../stores/leads.store'
-import { getFilters, exportLeads, searchFilterField } from '../api/leads'
+import { getFilters, exportLeads, searchFilterField, updateLead, deleteLead } from '../api/leads'
 import SearchSelect from '../components/SearchSelect.vue'
 import ExportModal from '../components/ExportModal.vue'
+import EditLeadModal from '../components/EditLeadModal.vue'
 
 const store = useLeadsStore()
 const showModal = ref(false)
 const filtersLoading = ref(true)
+const editingLead = ref<Record<string, any> | null>(null)
 
 /**
  * ✅ Tipos para evitar TS7053 quando usar item.key
@@ -109,10 +111,11 @@ async function handleExport(meta: ExportMeta) {
 
   if (result.ok) {
     showModal.value = false
+    store.clearExportError()
     return
   }
 
-  store.error = result.message || 'Falha ao exportar'
+  store.setExportError(result.message || 'Falha ao exportar')
 }
 async function loadFilters() {
   filtersLoading.value = true
@@ -129,18 +132,34 @@ async function loadFilters() {
     }
   } catch (err) {
     console.error('Erro ao carregar filtros:', err)
-    store.error = 'Erro ao carregar opções de filtro.'
+    store.setError('Erro ao carregar opções de filtro.')
   } finally {
     filtersLoading.value = false
   }
 }
 
 async function loadLeads() {
+  await store.applyFilters(filters)
+}
+
+async function handleEditSave(data: Record<string, string>) {
+  if (!editingLead.value) return
   try {
+    await updateLead(editingLead.value._id, data)
+    editingLead.value = null
     await store.fetchLeads(filters)
-  } catch (err) {
-    console.error('Erro ao carregar leads:', err)
-    store.error = 'Erro ao filtrar leads.'
+  } catch (err: any) {
+    store.setError(err?.response?.data?.message || 'Erro ao salvar lead.')
+  }
+}
+
+async function handleDeleteLead(id: string, label: string) {
+  if (!confirm(`Excluir o lead "${label}"? Essa ação não pode ser desfeita.`)) return
+  try {
+    await deleteLead(id)
+    await store.fetchLeads(filters)
+  } catch (err: any) {
+    store.setError(err?.response?.data?.message || 'Erro ao excluir lead.')
   }
 }
 
@@ -187,6 +206,9 @@ onMounted(async () => {
             Exportar
           </button>
         </div>
+        <p v-if="store.exportError" class="error export-error">
+          {{ store.exportError }}
+        </p>
       </div>
       <p class="total">
         Total: {{ store.total }}
@@ -198,6 +220,7 @@ onMounted(async () => {
               <th v-for="col in fixedColumns" :key="col">
                 {{ col.replace(/_/g,' ').toUpperCase() }}
               </th>
+              <th>AÇÕES</th>
             </tr>
           </thead>
           <tbody>
@@ -205,9 +228,42 @@ onMounted(async () => {
               <td v-for="col in fixedColumns" :key="col">
                 {{ lead[col] ?? '—' }}
               </td>
+              <td class="row-actions">
+                <button class="btn-icon" aria-label="Editar lead" @click="editingLead = lead">
+                  Editar
+                </button>
+                <button
+                  class="btn-icon btn-danger"
+                  aria-label="Excluir lead"
+                  @click="handleDeleteLead(lead._id, lead.nome || lead.email)"
+                >
+                  Excluir
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="pagination" v-if="store.totalPages > 1">
+        <button
+          class="btn-outline"
+          :disabled="store.page <= 1 || store.loading"
+          aria-label="Página anterior"
+          @click="store.goToPage(store.page - 1, filters)"
+        >
+          ← Anterior
+        </button>
+        <span class="page-indicator">
+          Página {{ store.page }} de {{ store.totalPages }}
+        </span>
+        <button
+          class="btn-outline"
+          :disabled="store.page >= store.totalPages || store.loading"
+          aria-label="Próxima página"
+          @click="store.goToPage(store.page + 1, filters)"
+        >
+          Próxima →
+        </button>
       </div>
       <div v-if="store.loading" class="loading">
         Carregando leads...
@@ -219,6 +275,12 @@ onMounted(async () => {
         v-if="showModal"
         @close="showModal = false"
         @export="handleExport"
+      />
+      <EditLeadModal
+        v-if="editingLead"
+        :lead="editingLead"
+        @close="editingLead = null"
+        @save="handleEditSave"
       />
     </div>
   </AppShell>
@@ -373,6 +435,64 @@ tr:hover td {
   font-weight: 600;
   margin: 40px 0;
   font-size: 1.2rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-icon:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-icon.btn-danger:hover {
+  border-color: #ff5555;
+  color: #ff5555;
+}
+
+.export-error {
+  margin: 16px 0 0;
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin: 24px 0;
+}
+
+.pagination .btn-outline {
+  padding: 10px 20px;
+  font-size: 0.95rem;
+}
+
+.pagination .btn-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.page-indicator {
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
 @media (max-width: 1024px) {

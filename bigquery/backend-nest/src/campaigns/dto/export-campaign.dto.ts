@@ -1,5 +1,7 @@
+import { IsIn, IsOptional } from 'class-validator';
+
 export class ExportCampaignDto {
-  campaignName: string;
-  user?: string;
+  @IsOptional()
+  @IsIn(['csv', 'xlsx'])
   format?: 'csv' | 'xlsx';
 }

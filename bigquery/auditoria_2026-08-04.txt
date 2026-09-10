@@ -1,0 +1,384 @@
+RELATORIO DE AUDITORIA - Sistema BigQuery Leads (backend-nest + frontend)
+Data: 2026-08-04
+Escopo: backend-nest/src (NestJS + MongoDB driver nativo), frontend/src (Vue 3 + Pinia),
+        docker-compose.yml, Dockerfiles, nginx.conf, historico git
+Metodologia: 7 personas tecnicas independentes revisaram o sistema por lentes distintas
+Personas: Sentinela (Seguranca), Arquiteto (Backend), Operador (DevOps/SRE),
+          Curador (Frontend/UX), Cetico (QA/Testes), Analista (Dados), Estrategista (Produto/Negocio)
+
+===================================================================
+RESUMO EXECUTIVO
+===================================================================
+Total de achados: 36  |  CRITICOS: 11  |  FRACOS: 9  |  A MELHORAR: 16
+
+O sistema tem um nucleo funcional solido (filtro de leads -> exportacao ->
+registro automatico de campanha), mas apresenta tres blocos de risco serios
+que convergem em multiplas personas de forma independente, o que aumenta a
+confianca de que sao reais e prioritarios:
+
+1) SEGURANCA: nao existe autenticacao em nenhuma rota, ha um caminho de path
+   traversal na exportacao de arquivos, filtros aceitam regex nao escapado
+   (ReDoS) e uma senha do MongoDB esta versionada em texto puro no historico
+   do git desde o primeiro commit.
+2) VALIDACAO DE ENTRADA: DTOs foram criados mas nunca sao aplicados - nao
+   ha ValidationPipe global em nenhum endpoint do backend.
+3) PRODUTO INCOMPLETO: o fluxo de importacao de leads (a porta de entrada
+   de dados do sistema) esta quebrado ponta a ponta - o frontend chama um
+   endpoint de upload que nao existe no backend.
+
+Alem disso, a cobertura de testes automatizados e essencialmente zero, o
+que significa que qualquer correcao dos itens acima corre risco de
+regressao silenciosa se nao vier acompanhada de testes.
+
+Nota lateral: o nome do projeto ("BigQuery") e enganoso - nao ha nenhuma
+integracao com o Google BigQuery no codigo; o banco de dados real e
+MongoDB, e "bigquery" e apenas o nome do database Mongo por convencao.
+
+===================================================================
+PONTOS CRITICOS
+===================================================================
+
+1. Ausencia total de autenticacao e autorizacao
+   Personas: Sentinela, Estrategista
+   Localizacao: backend-nest/src/main.ts; todos os controllers
+                (leads.controller.ts, campaigns.controller.ts, imports.controller.ts);
+                frontend/src/router
+   Problema: nao existe nenhum Guard, middleware de auth, API key, JWT ou
+   tela de login em nenhuma camada do sistema. Qualquer requisicao HTTP
+   direta a API publica e atendida sem checar identidade.
+   Por que atualizar: a base de leads (PII - nome, e-mail, cargo, empresa)
+   e o principal ativo do sistema. Qualquer pessoa com acesso a URL publica
+   pode extrair toda a base, disparar exports em massa e acionar
+   processamento de import, sem rastreabilidade de quem fez o que.
+
+2. Credenciais do MongoDB em texto puro versionadas no historico do git
+   Persona: Operador
+   Localizacao: docker-compose.yml:15 (MONGO_URI com usuario/senha embutidos)
+   Problema: confirmado via "git show" que a senha esta presente desde o
+   primeiro commit do repositorio e permanece em todos os commits ate o HEAD.
+   Por que atualizar: mesmo rotacionando a senha hoje, ela continua exposta
+   permanentemente no historico do git. Qualquer clone do repositorio expoe
+   acesso total ao banco de producao. E necessario rotacionar a senha
+   imediatamente, mover para .env/secret manager (fora do git) e avaliar
+   reescrever o historico (BFG/git filter-repo).
+
+3. Path traversal na geracao de arquivos de exportacao
+   Personas: Sentinela, Cetico
+   Localizacao: backend-nest/src/leads/leads.service.ts:249-258, 329-338
+   Problema: o nome do arquivo de export e montado a partir de
+   "query.campaignName" (vindo direto da querystring) com apenas um
+   replace de espacos - barras e sequencias ".." nao sao removidas antes
+   de path.join(exportDir, filename).
+   Por que atualizar: combinado com a ausencia de autenticacao (item 1),
+   qualquer requisicao pode escrever arquivos em caminhos arbitrarios do
+   filesystem do container.
+
+4. Filtros de busca aceitam regex do usuario sem escape (risco de ReDoS)
+   Personas: Sentinela, Arquiteto, Analista (achado convergente, 3 lentes distintas)
+   Localizacao: backend-nest/src/leads/leads.service.ts:73 (buildMongoFilter);
+                backend-nest/src/campaigns/campaigns.service.ts:78-80
+   Problema: valores de query do usuario sao usados direto em
+   "{ $regex: values[0], $options: 'i' }" sem escapeRegex(), enquanto a
+   mesma classe usa escapeRegex corretamente em outro metodo (inconsistencia
+   confirmada pelo Arquiteto). Um valor como "(a+)+$" pode causar
+   backtracking catastrofico no MongoDB.
+   Por que atualizar: e uma negacao de servico exploravel remotamente e sem
+   autenticacao, na rota de listagem mais usada do sistema.
+
+5. Validacao de entrada inexistente em toda a API
+   Personas: Sentinela, Arquiteto, Cetico, Analista (achado convergente, 4 lentes distintas)
+   Localizacao: backend-nest/src/main.ts (sem ValidationPipe global);
+                todos os controllers usam "@Query() query: any" / "@Body() body?: any";
+                DTOs existem (process-import.dto.ts, campaigns/dto/*) mas nunca sao referenciados
+   Problema: class-validator e class-transformer estao instalados no
+   projeto mas nao protegem nenhuma rota na pratica.
+   Por que atualizar: qualquer campo extra ou malformado passa direto para
+   o banco/servicos internos sem checagem de tipo ou formato - e a causa
+   raiz de varios outros achados (regex nao validado, ObjectId invalido, etc).
+
+6. Fluxo de importacao de leads quebrado ponta a ponta
+   Persona: Estrategista
+   Localizacao: frontend/src/api/imports.ts (chama POST /imports/upload);
+                backend-nest/src/imports/imports.controller.ts (so expoe POST :id/process)
+   Problema: nao existe rota de upload no backend (sem Multer/FileInterceptor
+   em lugar nenhum). O proprio codigo tem um comentario admitindo isso
+   ("ajuste conforme seu endpoint real de upload").
+   Por que atualizar: a importacao e a principal porta de entrada de dados
+   do produto. Hoje, o operador nao consegue subir um CSV pela tela - isso
+   invalida a proposta central do sistema para uso real.
+
+7. Cobertura de testes automatizados e essencialmente zero
+   Persona: Cetico
+   Localizacao: todo o projeto - apenas 2 arquivos de teste existem, ambos
+                testando o endpoint boilerplate "Hello World" gerado pelo Nest CLI
+   Problema: nenhum service, controller ou DTO de negocio real (parsing de
+   CSV/XLSX, filtros Mongo, paginacao, criacao de campanhas) tem qualquer
+   teste. Frontend nao tem sequer um framework de teste configurado.
+   Por que atualizar: qualquer regressao nos itens criticos acima (ou em
+   qualquer correcao futura) so sera detectada em producao.
+
+8. Exportacao de leads carrega toda a collection em memoria
+   Persona: Analista
+   Localizacao: backend-nest/src/leads/leads.service.ts:235, 303 (exportXLSX/exportCSV)
+   Problema: usa find(filter).toArray() sem cursor/streaming, ao contrario
+   de campaigns.service.ts (linhas 102-153), que faz a mesma tarefa com
+   cursor e streaming real (fast-csv/exceljs WorkbookWriter).
+   Por que atualizar: com a base de leads crescendo, o export pode
+   estourar a memoria do container (OOM) e derrubar o backend inteiro
+   (leads e campaigns compartilham o mesmo processo Node).
+
+9. Nenhum healthcheck configurado nos containers
+   Persona: Operador
+   Localizacao: docker-compose.yml (ambos os servicos); nenhum dos Dockerfiles
+   Problema: com "restart: unless-stopped", o Docker so reinicia o
+   container se o processo morrer, nao se travar/ficar sem resposta.
+   Por que atualizar: sem healthcheck, degradacao silenciosa (ex: backend
+   preso numa conexao Mongo) nao e detectada automaticamente, aumentando o
+   tempo de deteccao/recuperacao de incidentes.
+
+10. Paginacao de leads implementada no backend/store mas nunca exposta na UI
+    Persona: Curador
+    Localizacao: frontend/src/stores/leads.store.ts:8-10 (page, totalPages, limit ja existem
+                 e sao enviados ao backend); frontend/src/views/LeadsView.vue (sem controles de pagina)
+    Problema: o usuario so enxerga os primeiros 50 registros de qualquer
+    filtro e nao tem como navegar para o restante.
+    Por que atualizar: e perda de funcionalidade real (nao apenas
+    estetica) - a infraestrutura de paginacao ja existe e esta ociosa.
+
+11. Componente SearchSelect duplicado com bug estrutural de CSS
+    Persona: Curador
+    Localizacao: frontend/src/components/SearchSelect.vue (em uso, correto)
+                 vs frontend/src/views/SearchSelect.vue (nao usado, orfao)
+    Problema: a copia nao utilizada tem CSS fora de qualquer tag <style>
+    (nunca seria aplicado se usada) e nao esta referenciada por nenhuma rota.
+    Por que atualizar: e codigo morto que confunde manutencao futura -
+    risco real de alguem editar o arquivo errado achando que afeta a tela
+    de Leads.
+
+===================================================================
+PONTOS FRACOS
+===================================================================
+
+1. Containers Docker rodando como root
+   Persona: Operador
+   Localizacao: backend-nest/Dockerfile; frontend/Dockerfile (sem diretiva USER)
+   Por que atualizar: em caso de RCE na aplicacao, o processo comprometido
+   roda com privilegios de root dentro do container.
+
+2. Sem CI/CD e sem versionamento de imagem
+   Persona: Operador
+   Localizacao: ausencia de .github/workflows ou qualquer pipeline
+   Por que atualizar: deploys manuais via docker compose direto no
+   servidor, sem scan de vulnerabilidade nem rollback automatizado, sao
+   dificeis de auditar e reverter.
+
+3. Uso extensivo de tipagem "any" em backend e frontend
+   Personas: Arquiteto, Curador
+   Localizacao: query/filter/mapping/err no backend; params/campaigns/leads no frontend
+   Por que atualizar: anula os beneficios do TypeScript - mudancas de
+   formato na API nao geram erro de build, so quebram em runtime.
+
+4. Duplicacao de codigo entre Leads e Campaigns
+   Personas: Arquiteto, Curador
+   Localizacao: EXPORT_FIELDS em leads.service.ts vs campaigns.service.ts
+                (listas quase identicas mas nao iguais); CSS quase identico
+                entre LeadsView.vue e ImportsView.vue
+   Por que atualizar: as duas listas de export ja divergiram (campaigns
+   inclui import_id/updated_at, leads nao) apesar do comentario dizer que
+   "mantem o mesmo padrao" - risco de relatorios inconsistentes entregues
+   ao cliente sem que ninguem perceba.
+
+5. Frontend sem nenhum framework de teste configurado
+   Persona: Cetico
+   Localizacao: frontend/package.json (sem vitest/jest/@vue/test-utils)
+   Por que atualizar: toda a logica de filtro/paginacao replicada no
+   frontend fica sujeita a regressao silenciosa.
+
+6. Log de debug expoe dados de filtro em producao
+   Personas: Sentinela, Analista, Cetico (achado convergente)
+   Localizacao: backend-nest/src/leads/leads.service.ts:88 (console.log
+                "[DEBUG Backend] Filtro Mongo gerado")
+   Por que atualizar: roda em toda chamada (inclusive dentro de aggregates
+   executados varias vezes por request), expondo criterios de busca -
+   potencialmente dados de negocio sensiveis - em stdout, sem controle de
+   nivel de log.
+
+7. Redundancia de bibliotecas de CSV/Excel
+   Persona: Analista
+   Localizacao: package.json traz xlsx, exceljs, fast-csv e csv-parser ao
+                mesmo tempo; csv-parser nao e usado em lugar nenhum de src/
+   Por que atualizar: duas abordagens diferentes (sincrona/memoria vs
+   streaming) para o mesmo problema aumentam custo de manutencao e
+   explicam a divergencia de performance do item critico 8.
+
+8. Dependencia "xlsx" com vulnerabilidade conhecida
+   Persona: Sentinela
+   Localizacao: backend-nest/package.json (xlsx@0.18.5)
+   Por que atualizar: versao com CVE conhecido de Prototype
+   Pollution/ReDoS sem correcao disponivel no registry padrao do npm,
+   usada diretamente sobre dados vindos do Mongo no export.
+
+9. Codigo morto no fluxo de imports e configuracao
+   Personas: Arquiteto, Analista
+   Localizacao: ImportsService.create() (imports.service.ts:14-24) nunca e
+                chamado por nenhum controller; config/database.config.ts vazio;
+                ConfigModule.forRoot() repetido em cada modulo em vez de isGlobal
+   Por que atualizar: indica fluxo de criacao de registro de import
+   incompleto/orfao e configuracao redundante que aumenta a chance de
+   inconsistencia entre modulos.
+
+===================================================================
+PONTOS A MELHORAR
+===================================================================
+
+1. Tratamento de erro generico sem logging estruturado
+   Persona: Arquiteto
+   Localizacao: controllers de leads/campaigns/imports (try/catch repetido,
+                sem Logger do Nest nem ExceptionFilter global)
+   Por que atualizar: em producao, toda falha real (timeout de Mongo, erro
+   de disco) vira uma mensagem fixa de 500, dificultando diagnostico.
+
+2. ObjectId sem validacao de formato antes de instanciar
+   Personas: Arquiteto, Cetico
+   Localizacao: campaigns.service.ts:89,123; imports.service.ts:31
+   Por que atualizar: um id malformado lanca excecao nao tratada (500
+   generico) em vez de um erro 400 claro para o cliente da API.
+
+3. Acoplamento forte entre Leads e Campaigns via efeito colateral
+   Persona: Arquiteto
+   Localizacao: leads.service.ts:265-276,341-352 (export chama
+                campaignsService.createCampaign como side-effect)
+   Por que atualizar: mistura responsabilidades e dificulta testar
+   LeadsService isoladamente.
+
+4. Ausencia de camada de repositorio e I/O sincrono bloqueante
+   Persona: Arquiteto
+   Localizacao: acesso direto a db.collection(...) nos services;
+                fs.existsSync/mkdirSync/writeFileSync sincronos no caminho de uma request HTTP
+   Por que atualizar: sob carga, chamadas de filesystem sincronas bloqueiam
+   o event loop do Node, degradando todas as requisicoes concorrentes.
+
+5. Nginx sem headers de seguranca
+   Persona: Operador
+   Localizacao: frontend/nginx.conf (sem CSP, X-Frame-Options,
+                X-Content-Type-Options, Referrer-Policy, HSTS)
+   Por que atualizar: aumenta exposicao a clickjacking, MIME-sniffing e XSS
+   no frontend publico.
+
+6. Gzip nao habilitado no nginx
+   Persona: Operador
+   Localizacao: frontend/nginx.conf
+   Por que atualizar: assets JS/CSS do build Vite sao servidos sem
+   compressao, aumentando tempo de carregamento e custo de banda.
+
+7. Filtros com regex nao ancorada anulam o uso dos indices Mongo
+   Persona: Analista
+   Localizacao: leads.service.ts (findAll, getFilters, searchFieldValues)
+   Por que atualizar: indices existem para setor_empresa/estado_empresa/
+   cargo/client, mas regex sem "^" forca collection scan mesmo com
+   indice criado - a listagem principal vai degradar a medida que a base
+   cresce.
+
+8. Download de campanha sem tratamento de erro
+   Persona: Curador
+   Localizacao: frontend/src/api/campaigns.ts:8-11 (window.open direto)
+   Por que atualizar: se o backend retornar erro, o usuario so ve uma aba
+   em branco, sem mensagem - inconsistente com o fluxo de export de leads,
+   que trata erro corretamente.
+
+9. Acessibilidade: botoes de acao so com simbolo, sem aria-label
+   Persona: Curador
+   Localizacao: SearchSelect.vue:144,162 (badge-remove, ss-clear);
+                ExportModal.vue:36
+   Por que atualizar: leitor de tela anuncia apenas o glifo ("x") sem
+   contexto do que sera removido/fechado.
+
+10. ImportsView sem loading/disable durante requisicoes
+    Persona: Curador
+    Localizacao: frontend/src/views/ImportsView.vue:10-36
+    Por que atualizar: cliques repetidos durante upload/processamento
+    podem disparar requisicoes concorrentes duplicadas.
+
+11. Mutacao direta do state da store fora das actions
+    Persona: Curador
+    Localizacao: LeadsView.vue:115,132,143 (store.error = ... direto na view)
+    Por que atualizar: erros de export e de listagem compartilham o mesmo
+    campo de estado, podendo sobrescrever/confundir a mensagem exibida ao
+    usuario.
+
+12. Sem dashboard ou metricas agregadas
+    Persona: Estrategista
+    Localizacao: frontend/src/router/index.ts (so ha Leads, Campanhas, Imports)
+    Por que atualizar: para um produto de geracao/gestao de leads voltado a
+    vendas, a falta de indicadores agregados (totais por periodo, evolucao
+    de importacoes) e uma lacuna de valor percebido.
+
+13. Sem CRUD de leads/campanhas (somente leitura)
+    Persona: Estrategista
+    Localizacao: leads.controller.ts (so GET); nenhum endpoint de edicao/exclusao
+    Por que atualizar: um dado incorreto (email invalido, cargo
+    desatualizado) so pode ser corrigido com acesso direto ao banco.
+
+14. Nome do projeto "BigQuery" e enganoso
+    Personas: Analista, Estrategista
+    Localizacao: AppShell.vue ("BigQuery Leads"), MONGO_URI (database "bigquery")
+    Por que atualizar: nao ha nenhuma integracao com o Google BigQuery no
+    codigo - o banco real e MongoDB. Isso confunde novos desenvolvedores e
+    cria expectativa de negocio equivocada sobre capacidade analitica.
+
+15. Importacao depende de servico ETL externo nao versionado no repositorio
+    Personas: Analista, Estrategista
+    Localizacao: imports.service.ts (axios.post para ETL_URL, default
+                 localhost:8001/process, sem timeout configurado)
+    Por que atualizar: mesmo corrigindo o upload (item critico 6), o
+    processamento depende de uma peca de infraestrutura invisivel a esta
+    auditoria, sem contrato documentado.
+
+16. Lista de campanhas sem paginacao visivel
+    Persona: Estrategista
+    Localizacao: CampaignsView.vue / campaigns.controller.ts
+    Por que atualizar: como uma campanha e criada a cada export de leads, a
+    lista tende a crescer sem controle de performance/UX ao longo do tempo.
+
+===================================================================
+OBSERVACOES POR PERSONA
+===================================================================
+
+SENTINELA (Seguranca): destacou a ausencia de autenticacao como o risco
+central do sistema, alem de path traversal, ReDoS via regex e uma
+dependencia (xlsx) com CVE conhecido. Pontos positivos identificados: CORS
+configurado corretamente (sem wildcard + credentials) e erros nao vazam
+stack trace ao cliente.
+
+ARQUITETO (Backend): concentrou-se na dividia tecnica de validacao (DTOs
+inertes) e em problemas estruturais (I/O sincrono, acoplamento Leads-
+Campaigns, ausencia de camada de repositorio). Elogiou a separacao por
+modulo de feature e o uso consistente de injecao de dependencia.
+
+OPERADOR (DevOps/SRE): confirmou via "git show" que a senha do Mongo esta
+exposta desde o primeiro commit - o achado mais grave desta lente. Tambem
+apontou ausencia de healthcheck, containers como root e falta de CI/CD.
+
+CURADOR (Frontend/UX): encontrou a paginacao "invisivel" (implementada mas
+nao exposta) como o achado de maior impacto ao usuario final, alem de
+codigo morto (SearchSelect duplicado) e inconsistencias de tratamento de
+erro entre telas.
+
+CETICO (QA/Testes): confirmou que a cobertura de teste real e zero - os
+unicos testes existentes cobrem o boilerplate do Nest CLI, nao a logica de
+negocio. Reforcou, por outro angulo, os mesmos riscos de validacao de
+entrada e ObjectId ja vistos pelo Arquiteto e Sentinela.
+
+ANALISTA (Dados): esclareceu que nao ha integracao real com Google
+BigQuery - o sistema roda 100% sobre MongoDB. Identificou o export de
+leads sem streaming (risco de OOM) e o uso de regex nao ancorada anulando
+os indices existentes.
+
+ESTRATEGISTA (Produto/Negocio): apontou o achado de maior impacto de
+negocio - o fluxo de importacao de leads esta quebrado ponta a ponta,
+invalidando a proposta central do produto. Tambem notou a ausencia de
+dashboard, CRUD e a confusao gerada pelo nome "BigQuery".
+
+===================================================================
+FIM DO RELATORIO
+===================================================================

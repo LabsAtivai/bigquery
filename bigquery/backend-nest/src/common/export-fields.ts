@@ -1,0 +1,17 @@
+export const LEAD_EXPORT_FIELDS = [
+  'email',
+  'nome',
+  'nome_completo',
+  'linkedin',
+  'cargo',
+  'pais',
+  'localizacao',
+  'empresa',
+  'url_empresa',
+  'tamanho',
+  'pais_empresa',
+  'localizacao_empresa',
+  'estado_empresa',
+  'cidade_empresa',
+  'setor_empresa',
+];

@@ -1,4 +1,10 @@
 import http from './http'
+import {
+  getFilenameFromHeaders,
+  downloadBlob,
+  extractBlobErrorMessage,
+  type DownloadResult,
+} from './download.util'
 
 function buildQuery(params: any) {
   const query = new URLSearchParams()
@@ -44,27 +50,6 @@ export function searchFilterField(field: string, term: string, params: any = {})
 }
 
 /**
- * Extrair filename do header Content-Disposition
- */
-function getFilenameFromHeaders(headers: any) {
-  const cd =
-    headers?.['content-disposition'] ||
-    headers?.['Content-Disposition']
-
-  if (!cd) return null
-
-  const match = /filename\*?=(?:UTF-8''|")?([^";\n]+)/i.exec(cd)
-
-  if (!match?.[1]) return null
-
-  try {
-    return decodeURIComponent(match[1].replace(/"/g, '').trim())
-  } catch {
-    return match[1].replace(/"/g, '').trim()
-  }
-}
-
-/**
  * Nome fallback caso backend não envie filename
  */
 function fallbackFilename(params: any) {
@@ -80,26 +65,9 @@ function fallbackFilename(params: any) {
 }
 
 /**
- * Download de blob no browser
- */
-function downloadBlob(blob: Blob, filename: string) {
-  const url = window.URL.createObjectURL(blob)
-
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-
-  document.body.appendChild(a)
-  a.click()
-
-  a.remove()
-  window.URL.revokeObjectURL(url)
-}
-
-/**
  * Exportar leads com filtros aplicados
  */
-export async function exportLeads(params: any) {
+export async function exportLeads(params: any): Promise<DownloadResult> {
   try {
     const resp = await http.get('/leads/export', {
       params,
@@ -115,32 +83,20 @@ export async function exportLeads(params: any) {
     return { ok: true }
 
   } catch (err: any) {
-    const blob = err?.response?.data
-
-    // Backend pode retornar erro JSON dentro de blob
-    if (blob instanceof Blob) {
-      try {
-        const text = await blob.text()
-        const json = JSON.parse(text)
-
-        return {
-          ok: false,
-          status: err?.response?.status,
-          message: json?.message || text
-        }
-      } catch {
-        return {
-          ok: false,
-          status: err?.response?.status,
-          message: 'Falha ao exportar'
-        }
-      }
-    }
-
-    return {
-      ok: false,
-      status: err?.response?.status,
-      message: err?.message || 'Falha ao exportar'
-    }
+    return extractBlobErrorMessage(err)
   }
+}
+
+/**
+ * Editar campos de um lead
+ */
+export function updateLead(id: string, data: Record<string, string>) {
+  return http.patch(`/leads/${id}`, data)
+}
+
+/**
+ * Excluir um lead
+ */
+export function deleteLead(id: string) {
+  return http.delete(`/leads/${id}`)
 }

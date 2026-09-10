@@ -33,7 +33,7 @@ function handleSubmit() {
     <div class="modal">
       <div class="modal-head">
         <div class="modal-title">Exportar Leads</div>
-        <button class="icon" @click="emit('close')">✕</button>
+        <button class="icon" aria-label="Fechar" @click="emit('close')">✕</button>
       </div>
 
       <div class="grid">
@@ -51,6 +51,10 @@ function handleSubmit() {
         <label>
           <span>Quem está baixando</span>
           <input v-model="form.downloadedBy" placeholder="Ex: Charles" />
+        </label>
+        <label>
+          <span>Usuário (login)</span>
+          <input v-model="form.user" placeholder="Ex: charles" />
         </label>
         <label>
           <span>Nome do cliente</span>

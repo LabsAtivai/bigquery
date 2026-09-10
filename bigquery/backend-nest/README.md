@@ -57,6 +57,35 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Variáveis de ambiente
+
+Crie um `.env` (veja `.env.example` na raiz do projeto) com pelo menos:
+
+```
+MONGO_URI=mongodb://usuario:senha@host:27017/bigquery?authSource=admin
+MONGO_DB=bigquery
+JWT_SECRET=uma-string-longa-e-aleatoria
+JWT_EXPIRES_IN=12h
+ETL_URL=http://localhost:8001/process
+ETL_TIMEOUT_MS=30000
+SEED_ADMIN_EMAIL=admin@empresa.com
+SEED_ADMIN_PASSWORD=escolha-uma-senha-forte
+```
+
+## Autenticação
+
+A API exige login (JWT) em todas as rotas, exceto `POST /api/auth/login` e
+`GET /api/health`. Como não há tela de cadastro (ferramenta interna), crie o
+primeiro usuário com o script de seed:
+
+```bash
+$ npm run seed:admin
+```
+
+Ele lê `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` do `.env` e cria (ou atualiza
+a senha de) esse usuário na collection `users`. Rode de novo com valores
+diferentes para trocar a senha ou criar outro usuário.
+
 ## Deployment
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth.store'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const tabs = [
   { label: 'Leads', path: '/leads' },
@@ -12,6 +14,11 @@ const tabs = [
 ]
 
 const active = computed(() => route.path)
+
+function handleLogout() {
+  auth.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -36,6 +43,13 @@ const active = computed(() => route.path)
           {{ tab.label }}
         </button>
       </nav>
+
+      <div class="user-box">
+        <span class="user-email" v-if="auth.user">{{ auth.user.email }}</span>
+        <button class="logout-btn" type="button" aria-label="Sair" @click="handleLogout">
+          Sair
+        </button>
+      </div>
     </header>
 
     <main class="main-content">
@@ -130,5 +144,32 @@ const active = computed(() => route.path)
 .main-content {
   flex: 1;
   padding: 24px;
+}
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-email {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: var(--transition);
+}
+
+.logout-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 </style>

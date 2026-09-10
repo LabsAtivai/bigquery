@@ -14,8 +14,13 @@ const query = reactive({
 let t: any = null
 watch(query, () => {
   clearTimeout(t)
-  t = setTimeout(() => store.fetchCampaigns(query), 300)
+  t = setTimeout(() => store.applyFilters(query), 300)
 }, { deep: true })
+
+function handleDelete(id: string, name: string) {
+  if (!confirm(`Excluir a campanha "${name}"? Essa ação não pode ser desfeita.`)) return
+  store.deleteCampaign(id, query)
+}
 
 onMounted(() => store.fetchCampaigns(query))
 </script>
@@ -69,6 +74,11 @@ onMounted(() => store.fetchCampaigns(query))
               <td class="actions">
                 <button class="btn-outline" @click="store.downloadCampaign(c._id, 'xlsx')">XLSX</button>
                 <button class="btn-outline" @click="store.downloadCampaign(c._id, 'csv')">CSV</button>
+                <button
+                  class="btn-outline btn-danger"
+                  aria-label="Excluir campanha"
+                  @click="handleDelete(c._id, c.name)"
+                >Excluir</button>
               </td>
             </tr>
           </tbody>
@@ -78,6 +88,22 @@ onMounted(() => store.fetchCampaigns(query))
       <div v-else class="empty">
         <div class="muted" v-if="store.loading">Carregando…</div>
         <div class="muted" v-else>Nenhuma campanha encontrada.</div>
+      </div>
+
+      <div class="pagination" v-if="store.totalPages > 1">
+        <button
+          class="btn-outline"
+          :disabled="store.page <= 1 || store.loading"
+          aria-label="Página anterior"
+          @click="store.goToPage(store.page - 1, query)"
+        >← Anterior</button>
+        <span class="page-indicator">Página {{ store.page }} de {{ store.totalPages }}</span>
+        <button
+          class="btn-outline"
+          :disabled="store.page >= store.totalPages || store.loading"
+          aria-label="Próxima página"
+          @click="store.goToPage(store.page + 1, query)"
+        >Próxima →</button>
       </div>
 
       <div class="error" v-if="store.error">{{ store.error }}</div>
@@ -151,4 +177,29 @@ tr:hover td{ background: rgba(255,106,0,.06); }
 .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
 .empty{ padding: 16px; border:1px dashed var(--border); border-radius:16px; margin-top:14px; }
 .error{ margin-top: 12px; color: #ff4d4d; font-weight: 800; }
+
+.btn-danger {
+  border-color: rgba(255, 77, 77, 0.5);
+  background: rgba(255, 77, 77, 0.08);
+  color: #ff4d4d;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 16px;
+}
+
+.pagination .btn-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-indicator {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 13px;
+}
 </style>
