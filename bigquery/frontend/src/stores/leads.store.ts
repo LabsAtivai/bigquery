@@ -53,6 +53,12 @@ export const useLeadsStore = defineStore('leads', {
       await this.fetchLeads(filters)
     },
 
+    async setLimit(limit: number, filters: any) {
+      this.limit = limit
+      this.page = 1
+      await this.fetchLeads(filters)
+    },
+
     setExportError(message: string) {
       this.exportError = message
     },

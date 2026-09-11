@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import AppShell from '../components/AppShell.vue'
 import { useLeadsStore } from '../stores/leads.store'
 import { getFilters, exportLeads, searchFilterField, updateLead, deleteLead } from '../api/leads'
@@ -142,6 +142,42 @@ async function loadLeads() {
   await store.applyFilters(filters)
 }
 
+const pageSizeOptions = [25, 50, 100, 200] as const
+
+async function handleLimitChange(e: Event) {
+  const value = Number((e.target as HTMLSelectElement).value)
+  await store.setLimit(value, filters)
+}
+
+async function clearFilters() {
+  filterOrder.forEach((item) => {
+    filters[item.key] = []
+  })
+  await loadLeads()
+}
+
+const isInitialLoading = computed(() => store.loading && store.leads.length === 0)
+const isRefetching = computed(() => store.loading && store.leads.length > 0)
+const showEmptyState = computed(
+  () => !store.loading && store.leads.length === 0 && !store.error,
+)
+
+const resultRange = computed(() => {
+  if (!store.total) return null
+  const from = (store.page - 1) * store.limit + 1
+  const to = Math.min(store.page * store.limit, store.total)
+  return { from, to }
+})
+
+const pageInput = ref('')
+
+function submitPageJump() {
+  const target = Number(pageInput.value)
+  if (!Number.isInteger(target) || target < 1 || target > store.totalPages) return
+  store.goToPage(target, filters)
+  pageInput.value = ''
+}
+
 async function handleEditSave(data: Record<string, string>) {
   if (!editingLead.value) return
   try {
@@ -163,9 +199,11 @@ async function handleDeleteLead(id: string, label: string) {
   }
 }
 
-onMounted(async () => {
-  await loadFilters()
-  await loadLeads()
+onMounted(() => {
+  // Filtros e leads não dependem um do outro no boot — buscar em paralelo
+  // reduz o tempo até a tabela aparecer pela primeira vez.
+  loadFilters()
+  loadLeads()
 })
 </script>
 
@@ -174,8 +212,8 @@ onMounted(async () => {
     <div class="page">
       <h2>Leads</h2>
       <div class="filters-bar">
-        <div v-if="filtersLoading" class="loading">
-          Carregando filtros...
+        <div v-if="filtersLoading" class="filter-group" aria-hidden="true">
+          <span v-for="item in filterOrder" :key="item.key" class="skeleton-bar skeleton-bar--field" />
         </div>
         <div v-else-if="Object.keys(filterOptions).length === 0" class="empty">
           Nenhuma opção de filtro disponível.
@@ -197,7 +235,8 @@ onMounted(async () => {
             @click="loadLeads"
             :disabled="store.loading"
           >
-            Filtrar
+            <span v-if="isRefetching" class="spinner" aria-hidden="true" />
+            {{ isRefetching ? 'Filtrando…' : 'Filtrar' }}
           </button>
           <button
             class="btn-outline"
@@ -210,11 +249,45 @@ onMounted(async () => {
           {{ store.exportError }}
         </p>
       </div>
-      <p class="total">
-        Total: {{ store.total }}
+
+      <p v-if="store.error" class="alert alert-error">
+        <svg class="alert-icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="10" cy="10" r="8.25" stroke="currentColor" stroke-width="1.5" />
+          <path d="M10 6v4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          <circle cx="10" cy="13.5" r="0.9" fill="currentColor" />
+        </svg>
+        {{ store.error }}
       </p>
-      <div class="table-container" v-if="store.leads.length">
-        <table>
+
+      <div class="results-bar">
+        <p class="results-count">
+          <template v-if="resultRange">
+            Mostrando <strong>{{ resultRange.from }}–{{ resultRange.to }}</strong> de <strong>{{ store.total }}</strong> leads
+          </template>
+          <template v-else-if="store.error">
+            Não foi possível carregar os leads
+          </template>
+          <template v-else-if="!isInitialLoading">
+            Nenhum lead encontrado
+          </template>
+          <template v-else>
+            Carregando leads…
+          </template>
+        </p>
+        <label class="page-size">
+          Por página
+          <select :value="store.limit" :disabled="store.loading" @change="handleLimitChange">
+            <option v-for="size in pageSizeOptions" :key="size" :value="size">{{ size }}</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="table-container" v-if="store.leads.length || isInitialLoading">
+        <div v-if="isRefetching" class="refresh-badge">
+          <span class="spinner" aria-hidden="true" />
+          Atualizando
+        </div>
+        <table :class="{ 'is-refreshing': isRefetching }">
           <thead>
             <tr>
               <th v-for="col in fixedColumns" :key="col">
@@ -223,7 +296,13 @@ onMounted(async () => {
               <th>AÇÕES</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="isInitialLoading">
+            <tr v-for="n in 10" :key="`skeleton-${n}`" class="skeleton-row" aria-hidden="true">
+              <td v-for="col in fixedColumns" :key="col"><span class="skeleton-bar" /></td>
+              <td><span class="skeleton-bar skeleton-bar--sm" /></td>
+            </tr>
+          </tbody>
+          <tbody v-else>
             <tr v-for="lead in store.leads" :key="lead._id">
               <td v-for="col in fixedColumns" :key="col">
                 {{ lead[col] ?? '—' }}
@@ -244,6 +323,18 @@ onMounted(async () => {
           </tbody>
         </table>
       </div>
+
+      <div v-else-if="showEmptyState" class="state-panel">
+        <svg class="state-icon" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <rect x="8" y="14" width="32" height="24" rx="3" stroke="currentColor" stroke-width="1.6" />
+          <path d="M8 22h9.5c.8 0 1.5.5 1.8 1.3l1 2.4c.3.8 1 1.3 1.8 1.3h3.8c.8 0 1.5-.5 1.8-1.3l1-2.4c.3-.8 1-1.3 1.8-1.3H40" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+          <path d="M16 14v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2" stroke="currentColor" stroke-width="1.6" />
+        </svg>
+        <p class="state-title">Nenhum lead encontrado</p>
+        <p class="state-hint">Ajuste ou limpe os filtros aplicados e tente novamente.</p>
+        <button class="btn-outline" @click="clearFilters">Limpar filtros</button>
+      </div>
+
       <div class="pagination" v-if="store.totalPages > 1">
         <button
           class="btn-outline"
@@ -264,13 +355,19 @@ onMounted(async () => {
         >
           Próxima →
         </button>
+        <form class="page-jump" @submit.prevent="submitPageJump">
+          <label for="page-jump-input">Ir para</label>
+          <input
+            id="page-jump-input"
+            v-model="pageInput"
+            type="number"
+            min="1"
+            :max="store.totalPages"
+            :disabled="store.loading"
+            placeholder="Nº"
+          />
+        </form>
       </div>
-      <div v-if="store.loading" class="loading">
-        Carregando leads...
-      </div>
-      <p v-if="store.error" class="error">
-        {{ store.error }}
-      </p>
       <ExportModal
         v-if="showModal"
         @close="showModal = false"
@@ -365,30 +462,195 @@ h2 {
   transform: translateY(-3px);
 }
 
-.total {
-  font-size: 1.5rem;
-  font-weight: 700;
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 24px;
+}
+
+.alert-error {
+  background: rgba(255, 85, 85, 0.1);
+  border: 1px solid rgba(255, 85, 85, 0.35);
+  color: #ff8f8f;
+}
+
+.alert-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.results-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.results-count {
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
+.results-count strong {
   color: var(--text-primary);
-  margin-bottom: 32px;
-  background: rgba(255, 106, 0, 0.08);
-  padding: 12px 20px;
-  border-radius: 12px;
+  font-weight: 700;
+}
+
+.page-size {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.page-size select {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.page-size select:hover {
+  border-color: var(--border-hover);
+}
+
+.page-size select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.spinner {
   display: inline-block;
-  border: 1px solid rgba(255, 106, 0, 0.2);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+  vertical-align: -2px;
+  margin-right: 6px;
+}
+
+.btn-primary .spinner {
+  border-color: rgba(0, 0, 0, 0.25);
+  border-top-color: #000;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .table-container {
+  position: relative;
   background: var(--bg-card);
   border-radius: 16px;
-  overflow: hidden;
+  overflow: auto;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border);
   max-height: calc(100vh - 340px);
 }
 
+.refresh-badge {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 10, 10, 0.88);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border-radius: 999px;
+  z-index: 20;
+  backdrop-filter: blur(6px);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
+}
+
+table.is-refreshing tbody {
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+}
+
+.skeleton-row {
+  pointer-events: none;
+}
+
+.skeleton-bar {
+  display: block;
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.13) 50%, rgba(255, 255, 255, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.skeleton-bar--sm {
+  width: 60%;
+}
+
+.skeleton-bar--field {
+  height: 52px;
+  border-radius: var(--radius);
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.state-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 64px 32px;
+  text-align: center;
+}
+
+.state-icon {
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 20px;
+  color: var(--text-muted);
+}
+
+.state-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.state-hint {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.state-panel .btn-outline {
+  padding: 10px 24px;
+  font-size: 0.95rem;
 }
 
 th {
@@ -421,7 +683,7 @@ tr:hover td {
   background: rgba(255, 106, 0, 0.08);
 }
 
-.loading, .empty {
+.empty {
   text-align: center;
   padding: 80px 20px;
   color: var(--text-muted);
@@ -475,6 +737,7 @@ tr:hover td {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 24px;
   margin: 24px 0;
 }
@@ -495,6 +758,42 @@ tr:hover td {
   font-weight: 600;
 }
 
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  padding-left: 20px;
+  border-left: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.page-jump input {
+  width: 68px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: 700;
+  -moz-appearance: textfield;
+}
+
+.page-jump input::-webkit-inner-spin-button,
+.page-jump input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.page-jump input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+
 @media (max-width: 1024px) {
   .filter-group {
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -509,5 +808,8 @@ tr:hover td {
   .action-buttons { flex-direction: column; gap: 12px; }
   table { font-size: 13px; }
   th, td { padding: 14px 16px; }
+  .results-bar { flex-direction: column; align-items: flex-start; }
+  .pagination { gap: 12px; }
+  .page-jump { margin-left: 0; padding-left: 0; border-left: none; }
 }
 </style>
