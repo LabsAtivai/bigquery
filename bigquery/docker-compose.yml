@@ -21,7 +21,7 @@ services:
     networks:
       - ativaai
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
+      test: ["CMD", "node", "-e", "const s=require('net').connect(3000,'127.0.0.1',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
