@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, onMounted, onBeforeUnmount } from 'vue'
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -26,13 +26,23 @@ function handleSubmit() {
   emit('export', { ...form })
   emit('close')
 }
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') emit('close')
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  document.querySelector<HTMLInputElement>('.modal input')?.focus()
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <div class="modal-backdrop" @click.self="emit('close')">
-    <div class="modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="export-title">
       <div class="modal-head">
-        <div class="modal-title">Exportar Leads</div>
+        <div class="modal-title" id="export-title">Exportar Leads</div>
         <button class="icon" aria-label="Fechar" @click="emit('close')">✕</button>
       </div>
 

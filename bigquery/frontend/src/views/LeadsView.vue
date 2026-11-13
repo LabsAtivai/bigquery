@@ -304,7 +304,7 @@ onMounted(() => {
           </tbody>
           <tbody v-else>
             <tr v-for="lead in store.leads" :key="lead._id">
-              <td v-for="col in fixedColumns" :key="col">
+              <td v-for="col in fixedColumns" :key="col" :title="lead[col] ?? undefined">
                 {{ lead[col] ?? '—' }}
               </td>
               <td class="row-actions">
@@ -386,14 +386,12 @@ onMounted(() => {
 <style scoped>
 /* SEUS STYLES MANTIDOS */
 .page {
-  padding: 40px 32px;
   background: var(--bg-primary);
-  min-height: 100vh;
 }
 
 h2 {
-  font-size: 2.4rem;
-  margin-bottom: 2rem;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
   color: var(--accent);
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -402,8 +400,8 @@ h2 {
 .filters-bar {
   background: var(--bg-card);
   border-radius: 16px;
-  padding: 32px;
-  margin-bottom: 40px;
+  padding: 28px;
+  margin-bottom: 28px;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border);
 }
@@ -411,13 +409,13 @@ h2 {
 .filter-group {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 32px;
-  margin-bottom: 32px;
+  gap: 20px 24px;
+  margin-bottom: 24px;
 }
 
 .action-buttons {
   display: flex;
-  gap: 20px;
+  gap: 16px;
   justify-content: flex-end;
   flex-wrap: wrap;
 }
@@ -425,10 +423,10 @@ h2 {
 .btn-primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-light));
   border: none;
-  padding: 14px 32px;
+  padding: 12px 28px;
   border-radius: 12px;
   color: #000;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -450,9 +448,9 @@ h2 {
   background: transparent;
   border: 2px solid var(--accent);
   color: var(--accent);
-  padding: 14px 32px;
+  padding: 10px 28px;
   border-radius: 12px;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
   transition: all 0.3s ease;
 }
@@ -560,7 +558,8 @@ h2 {
   overflow: auto;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border);
-  max-height: calc(100vh - 340px);
+  max-height: calc(100vh - 300px);
+  min-height: 240px;
 }
 
 .refresh-badge {
@@ -656,23 +655,28 @@ table.is-refreshing tbody {
 th {
   background: #0d0d0d;
   color: var(--accent-light);
-  padding: 18px 24px;
+  padding: 14px 20px;
   text-align: left;
+  white-space: nowrap;
   font-weight: 700;
   position: sticky;
   top: 0;
   z-index: 10;
   border-bottom: 2px solid var(--border);
   text-transform: uppercase;
-  font-size: 0.95rem;
-  letter-spacing: 0.5px;
+  font-size: 0.8rem;
+  letter-spacing: 0.6px;
 }
 
 td {
-  padding: 18px 24px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 tr:nth-child(even) td {
@@ -801,13 +805,13 @@ tr:hover td {
 }
 
 @media (max-width: 768px) {
-  .page { padding: 24px 16px; }
-  h2 { font-size: 1.9rem; }
-  .filters-bar { display: grid; gap: 22px; }
+  h2 { font-size: 1.6rem; }
+  .filters-bar { display: grid; gap: 18px; padding: 20px; }
   .filter-group { gap: 20px; }
   .action-buttons { flex-direction: column; gap: 12px; }
+  .action-buttons button { width: 100%; }
   table { font-size: 13px; }
-  th, td { padding: 14px 16px; }
+  th, td { padding: 10px 14px; }
   .results-bar { flex-direction: column; align-items: flex-start; }
   .pagination { gap: 12px; }
   .page-jump { margin-left: 0; padding-left: 0; border-left: none; }

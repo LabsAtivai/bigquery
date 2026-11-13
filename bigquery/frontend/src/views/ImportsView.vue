@@ -55,7 +55,7 @@ async function doProcess() {
 
         <div class="grid">
           <label class="box">
-            <span>Arquivo CSV</span>
+            <span>1. Arquivo CSV</span>
             <input type="file" accept=".csv" :disabled="uploading" @change="(e:any) => file = e.target.files?.[0] || null" />
             <button class="btn-primary" :disabled="!file || uploading" @click="doUpload">
               {{ uploading ? 'Enviando...' : 'Upload' }}
@@ -63,12 +63,12 @@ async function doProcess() {
           </label>
 
           <label class="box">
-            <span>ID do Import (opcional)</span>
+            <span>2. ID do Import (preenchido após o upload)</span>
             <input v-model="importId" placeholder="Cole o ID se já existir" />
           </label>
 
           <label class="box full">
-            <span>Mapping JSON</span>
+            <span>3. Mapping JSON</span>
             <textarea v-model="mappingJson" rows="10"></textarea>
             <button class="btn-primary" :disabled="!importId || processing" @click="doProcess">
               {{ processing ? 'Processando...' : 'Processar' }}
@@ -76,7 +76,7 @@ async function doProcess() {
           </label>
         </div>
 
-        <div class="status" v-if="status">{{ status }}</div>
+        <div class="status" v-if="status" role="status" aria-live="polite">{{ status }}</div>
       </div>
     </div>
   </AppShell>
@@ -84,14 +84,12 @@ async function doProcess() {
 
 <style scoped>
 .page {
-  padding: 40px 32px;
   background: var(--bg-primary);
-  min-height: 100vh;
 }
 
 h2 {
-  font-size: 2.4rem;
-  margin-bottom: 2rem;
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
   color: var(--accent);
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -100,7 +98,7 @@ h2 {
 .card {
   background: var(--bg-card);
   border-radius: 16px;
-  padding: 32px;
+  padding: 28px;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border);
 }
@@ -155,6 +153,8 @@ h2 {
 
 .box .btn-primary {
   align-self: flex-start;
+  padding: 12px 28px;
+  font-size: 1rem;
 }
 
 .status {
@@ -169,9 +169,9 @@ h2 {
 }
 
 @media (max-width: 768px) {
-  .page { padding: 24px 16px; }
-  h2 { font-size: 1.9rem; }
+  h2 { font-size: 1.6rem; }
   .card { padding: 20px; }
   .grid { gap: 16px; }
+  .box .btn-primary { width: 100%; align-self: stretch; }
 }
 </style>

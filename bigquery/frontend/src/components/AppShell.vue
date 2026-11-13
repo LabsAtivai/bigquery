@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.store'
 
@@ -14,6 +14,12 @@ const tabs = [
 ]
 
 const active = computed(() => route.path)
+
+// Titulo da aba do navegador acompanha a pagina atual
+watchEffect(() => {
+  const current = tabs.find((t) => t.path === active.value)
+  document.title = current ? `${current.label} • BigQuery Leads` : 'BigQuery Leads'
+})
 
 function handleLogout() {
   auth.logout()
@@ -32,20 +38,21 @@ function handleLogout() {
         </div>
       </div>
 
-      <nav class="tabs">
-        <button
+      <nav class="tabs" aria-label="Navegação principal">
+        <router-link
           v-for="tab in tabs"
           :key="tab.path"
+          :to="tab.path"
           class="tab"
           :class="{ active: active === tab.path }"
-          @click="router.push(tab.path)"
+          :aria-current="active === tab.path ? 'page' : undefined"
         >
           {{ tab.label }}
-        </button>
+        </router-link>
       </nav>
 
       <div class="user-box">
-        <span class="user-email" v-if="auth.user">{{ auth.user.email }}</span>
+        <span class="user-email" v-if="auth.user" :title="auth.user.email">{{ auth.user.email }}</span>
         <button class="logout-btn" type="button" aria-label="Sair" @click="handleLogout">
           Sair
         </button>
@@ -74,11 +81,11 @@ function handleLogout() {
   background: rgba(17, 17, 17, 0.92);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
-  padding: 16px 24px;
+  padding: 12px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 16px 20px;
   flex-wrap: wrap;
 }
 
@@ -125,6 +132,8 @@ function handleLogout() {
   padding: 10px 18px;
   border-radius: var(--radius);
   font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
   transition: var(--transition);
 }
 
@@ -143,7 +152,21 @@ function handleLogout() {
 
 .main-content {
   flex: 1;
-  padding: 24px;
+  width: 100%;
+  max-width: 1760px;
+  margin: 0 auto;
+  padding: 32px 32px 48px;
+}
+
+@media (max-width: 768px) {
+  .topbar { padding: 12px 16px; }
+  .brand-text .subtitle { display: none; }
+  .logo { width: 40px; height: 40px; font-size: 1.3rem; }
+  .brand-text .title { font-size: 1.15rem; }
+  .tabs { order: 3; width: 100%; gap: 8px; }
+  .tab { flex: 1; text-align: center; padding: 10px 8px; }
+  .user-email { display: none; }
+  .main-content { padding: 20px 16px 32px; }
 }
 
 .user-box {
@@ -155,6 +178,10 @@ function handleLogout() {
 .user-email {
   font-size: 0.85rem;
   color: var(--text-muted);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .logout-btn {

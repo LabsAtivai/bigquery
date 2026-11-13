@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, onMounted, onBeforeUnmount } from 'vue'
 
 const EDITABLE_FIELDS = [
   'email', 'nome', 'nome_completo', 'linkedin', 'cargo',
@@ -22,13 +22,23 @@ const form = reactive<Record<string, string>>(
 function handleSubmit() {
   emit('save', { ...form })
 }
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') emit('close')
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+  document.querySelector<HTMLInputElement>('.modal input')?.focus()
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
   <div class="modal-backdrop" @click.self="emit('close')">
-    <div class="modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title">
       <div class="modal-head">
-        <div class="modal-title">Editar Lead</div>
+        <div class="modal-title" id="edit-title">Editar Lead</div>
         <button class="icon" aria-label="Fechar" @click="emit('close')">✕</button>
       </div>
 

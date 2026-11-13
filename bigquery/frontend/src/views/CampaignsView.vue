@@ -27,13 +27,10 @@ onMounted(() => store.fetchCampaigns(query))
 
 <template>
   <AppShell>
+    <div class="page">
+    <h2>Campanhas</h2>
     <div class="card">
-      <div class="head">
-        <div>
-          <h2>Campanhas</h2>
-          <p class="muted">Pesquise por nome, usuário ou cliente e faça download do arquivo gerado.</p>
-        </div>
-      </div>
+      <p class="muted lead">Pesquise por nome, usuário ou cliente e faça download do arquivo gerado.</p>
 
       <div class="filters">
         <label>
@@ -67,10 +64,10 @@ onMounted(() => store.fetchCampaigns(query))
             <tr v-for="c in store.campaigns" :key="c._id">
               <td>{{ c.name }}</td>
               <td>{{ c.client || '-' }}</td>
-              <td>{{ c.created_by }}</td>
-              <td>{{ new Date(c.created_at).toLocaleString() }}</td>
+              <td>{{ c.created_by || '-' }}</td>
+              <td>{{ new Date(c.created_at).toLocaleString('pt-BR') }}</td>
               <td>{{ c.leads_count }}</td>
-              <td class="mono">{{ c.file?.filename }}</td>
+              <td class="mono">{{ c.file?.filename || '-' }}</td>
               <td class="actions">
                 <button class="btn-outline" @click="store.downloadCampaign(c._id, 'xlsx')">XLSX</button>
                 <button class="btn-outline" @click="store.downloadCampaign(c._id, 'csv')">CSV</button>
@@ -106,28 +103,29 @@ onMounted(() => store.fetchCampaigns(query))
         >Próxima →</button>
       </div>
 
-      <div class="error" v-if="store.error">{{ store.error }}</div>
+      <div class="error" v-if="store.error" role="alert">{{ store.error }}</div>
+    </div>
     </div>
   </AppShell>
 </template>
 
 <style scoped>
 .card{
-  background:#0f0f0f;
+  background:var(--bg-card);
   border:1px solid var(--border);
   border-radius:16px;
-  padding:16px;
+  padding:28px;
   box-shadow: 0 25px 60px rgba(0,0,0,.35);
 }
-.head{ display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
-h2{ color: var(--accent); margin:0; font-size:22px; font-weight:900; }
-.muted{ color: var(--muted); margin:6px 0 0 0; font-size:13px; }
+h2{ color: var(--accent); margin:0 0 1.5rem; font-size:2rem; font-weight:800; letter-spacing:-0.5px; }
+.muted{ color: var(--muted); margin:0; font-size:14px; }
+.lead{ margin-bottom:16px; }
+@media (max-width:768px){ h2{ font-size:1.6rem; } }
 
 .filters{
   display:grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap:12px;
-  margin-top:10px;
 }
 label{ display:flex; flex-direction:column; gap:6px; }
 label span{ color: var(--muted); font-size:12px; }
@@ -149,16 +147,19 @@ input{
 table{ width: 100%; border-collapse: collapse; min-width: 960px; }
 th{
   position: sticky; top:0;
-  background:#0f0f0f;
-  color: var(--accent);
+  background:#0d0d0d;
+  color: var(--accent-light);
   text-align:left;
-  padding: 12px;
+  padding: 14px 16px;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: .6px;
   border-bottom: 1px solid var(--border);
   font-weight: 900;
   white-space: nowrap;
 }
 td{
-  padding: 10px 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid rgba(255,255,255,.06);
   color: var(--text);
   white-space: nowrap;
@@ -169,13 +170,16 @@ tr:hover td{ background: rgba(255,106,0,.06); }
   border: 1px solid rgba(255,106,0,.5);
   background: rgba(255,106,0,.08);
   color: var(--accent);
-  font-weight: 800;
-  padding: 8px 10px;
-  border-radius: 12px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 10px;
   cursor:pointer;
+  transition: var(--transition);
 }
+.btn-outline:hover:not(:disabled){ background: rgba(255,106,0,.18); }
+.btn-danger:hover:not(:disabled){ background: rgba(255,77,77,.18) !important; }
 .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
-.empty{ padding: 16px; border:1px dashed var(--border); border-radius:16px; margin-top:14px; }
+.empty{ padding: 40px 16px; text-align:center; border:1px dashed var(--border); border-radius:16px; margin-top:14px; }
 .error{ margin-top: 12px; color: #ff4d4d; font-weight: 800; }
 
 .btn-danger {
