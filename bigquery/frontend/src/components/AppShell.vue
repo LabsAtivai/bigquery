@@ -72,6 +72,8 @@ function handleLogout() {
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
+  /* clip (e nao hidden) impede rolagem horizontal da pagina sem quebrar o position: sticky */
+  overflow-x: clip;
 }
 
 .topbar {
@@ -152,6 +154,7 @@ function handleLogout() {
 
 .main-content {
   flex: 1;
+  min-width: 0; /* permite que filhos largos (tabelas) rolem dentro do proprio container */
   width: 100%;
   max-width: 1760px;
   margin: 0 auto;

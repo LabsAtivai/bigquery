@@ -555,10 +555,13 @@ h2 {
   position: relative;
   background: var(--bg-card);
   border-radius: 16px;
-  overflow: auto;
+  overflow: auto; /* rolagem horizontal e vertical presas ao container */
+  overscroll-behavior-x: contain;
+  max-width: 100%;
   box-shadow: var(--shadow-md);
   border: 1px solid var(--border);
-  max-height: calc(100vh - 300px);
+  /* desconta topbar sticky + titulo + barra de resultados, mantendo a barra horizontal visivel */
+  max-height: calc(100vh - 220px);
   min-height: 240px;
 }
 
@@ -584,6 +587,7 @@ h2 {
 
 table {
   width: 100%;
+  min-width: max-content; /* colunas nunca sao espremidas/cortadas; o container rola */
   border-collapse: collapse;
 }
 
@@ -704,9 +708,12 @@ tr:hover td {
 }
 
 .row-actions {
-  display: flex;
-  gap: 8px;
   white-space: nowrap;
+  overflow: visible;
+}
+
+.row-actions .btn-icon + .btn-icon {
+  margin-left: 8px;
 }
 
 .btn-icon {
